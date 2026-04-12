@@ -171,10 +171,11 @@ else ifeq ($(platform), ngc)
    STATIC_LINKING := 1
 
 else ifeq ($(platform), ps2)
-   TARGET := $(TARGET_NAME)_libretro_ps2.a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = ee-gcc
    CXX = ee-g++
    AR = ee-ar
+   LD = ee-gcc
    DEFINES += -Dext_ps2 -DIPS2 -DGEKKO -D__PS2__ -D__PLAYSTATION2__
    CFLAGS += -O2 -G0 -fno-strict-aliasing
    # PS2 is 32-bit but needs specific alignment
