@@ -28,11 +28,11 @@ jobs:
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
               
-              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
-              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
-              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
+              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
+              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
+              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 3. GHOSTING DRIVERS (Maintenance of 5.84MB size)
+              # 3. GHOSTING DRIVERS
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' -exec cp /tmp/ghost.c {} \;
@@ -52,17 +52,22 @@ jobs:
               make platform=ps2 clean
               make platform=ps2 CC=ee-gcc AR=ee-ar -j\$(nproc)
 
-              # 6. DYNAMIC LINKING
+              # 6. DYNAMIC LINKING WITH DEEP SEARCH
               echo '--- LOCATING STARTUP FILES ---'
-              # This finds the file regardless of where the Docker image hides it
-              REAL_CRT0=\$(find \$PS2SDK -name 'crt0.o' | head -n 1)
-              REAL_LINKFILE=\$(find \$PS2SDK -name 'linkfile' | head -n 1)
+              # Searching from the root of ps2dev to be 100% sure
+              REAL_CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
+              REAL_LINKFILE=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
               
+              if [ -z \"\$REAL_CRT0\" ]; then echo 'ERROR: crt0.o still not found'; exit 1; fi
+
               echo \"Using CRT0: \$REAL_CRT0\"
               echo \"Using Linkfile: \$REAL_LINKFILE\"
 
               echo '--- LINKING AVP.ELF ---'
-              ee-gcc -T\"\$REAL_LINKFILE\" -L\"\$PS2SDK/ee/lib\" \
+              # We add -L paths to everywhere crt0.o might be hiding
+              ee-gcc -T\"\$REAL_LINKFILE\" \
+                -L\"\$PS2SDK/ee/lib\" \
+                -L\$(dirname \"\$REAL_CRT0\") \
                 -o AVP.ELF \
                 \"\$REAL_CRT0\" \
                 mame2000_libretro_ps2.a \
