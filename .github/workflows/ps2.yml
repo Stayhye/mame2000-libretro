@@ -1,31 +1,44 @@
 name: Build MAME 2000 PS2
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
 
 jobs:
   build-ps2:
     runs-on: ubuntu-latest
-    # We move the container definition down to the step level 
-    # to avoid the "missing git" trap during initial checkout.
-    
     steps:
+      # 1. Checkout on the host to avoid Git version issues inside the container
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
-          
-    - name: Build inside ps2dev container
+
+      # 2. Run the build inside the container using Docker
+      - name: Build MAME 2000
         run: |
           docker run --rm -v $(pwd):/src -w /src ps2dev/ps2dev:latest \
-          sh -c "apk add build-base git && \
-                 git config --global --add safe.directory /src && \
-                 export PS2DEV=/usr/local/ps2dev && \
-                 export PS2SDK=\$PS2DEV/ps2sdk && \
-                 export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2DEV/iop/bin:\$PS2SDK/bin && \
-                 make platform=ps2 -j$(nproc)"
-                 
-      - name: Upload ELF
+          sh -c "
+            # Install necessary build tools inside the container
+            apk add build-base git && \
+            
+            # Fix the 'dubious ownership' error
+            git config --global --add safe.directory /src && \
+            
+            # Setup the PS2 Toolchain environment paths
+            export PS2DEV=/usr/local/ps2dev && \
+            export PS2SDK=\$PS2DEV/ps2sdk && \
+            export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2DEV/iop/bin:\$PS2SDK/bin && \
+            
+            # Run the actual build
+            make platform=ps2 -j\$(nproc)
+          "
+
+      # 3. Upload the resulting ELF file
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mame2000_ps2_elf
