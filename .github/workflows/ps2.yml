@@ -14,12 +14,15 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
-      - name: Build inside ps2dev container
+          
+    - name: Build inside ps2dev container
         run: |
           docker run --rm -v $(pwd):/src -w /src ps2dev/ps2dev:latest \
           sh -c "apk add build-base git && \
                  git config --global --add safe.directory /src && \
+                 export PS2DEV=/usr/local/ps2dev && \
+                 export PS2SDK=\$PS2DEV/ps2sdk && \
+                 export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2DEV/iop/bin:\$PS2SDK/bin && \
                  make platform=ps2 -j$(nproc)"
                  
       - name: Upload ELF
