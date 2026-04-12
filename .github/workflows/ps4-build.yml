@@ -1,0 +1,8 @@
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: openorbis/toolchain:latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Compile
+        run: make platform=ps4
