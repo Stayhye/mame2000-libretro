@@ -1,8 +1,30 @@
+name: Build MAME 2000 PS4
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
 jobs:
-  build:
+  build-ps4:
     runs-on: ubuntu-latest
     container: openorbis/toolchain:latest
+    
     steps:
-      - uses: actions/checkout@v2
-      - name: Compile
-        run: make platform=ps4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Libretro Core
+        run: |
+          # Set toolchain path for the Makefile to find orbis-clang
+          export OO_PS4_TOOLCHAIN=/usr/local/openorbis
+          make platform=ps4 -j$(nproc)
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mame2000_libretro_ps4
+          path: |
+            *.a
+            *.elf
