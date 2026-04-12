@@ -21,14 +21,26 @@ jobs:
           docker run --rm \
             -v $(pwd):/src \
             -w /src \
-            --env PS2DEV=/usr/local/ps2dev \
-            --env PS2SDK=/usr/local/ps2dev/ps2sdk \
-            --env PATH="/usr/local/ps2dev/bin:/usr/local/ps2dev/ee/bin:/usr/local/ps2dev/iop/bin:/usr/local/ps2dev/ps2sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             ps2dev/ps2dev:latest \
             sh -c "
+              # 1. Install basics
               apk add --no-cache build-base git && \
               git config --global --add safe.directory /src && \
-              ls -l /usr/local/ps2dev/ee/bin/ee-gcc && \
+              
+              # 2. Dynamic Toolchain Discovery
+              # We find where the mips compilers are and link them to legacy names
+              export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;) && \
+              echo \"Found toolchain at: \$EE_BIN_PATH\" && \
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc && \
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar && \
+              
+              # 3. Set Environment
+              export PS2DEV=/usr/local/ps2dev && \
+              export PS2SDK=\$PS2DEV/ps2sdk && \
+              export PATH=\$PATH:/usr/local/bin:\$PS2DEV/bin:\$PS2SDK/bin && \
+              
+              # 4. Compile
               make platform=ps2 -j\$(nproc)
             "
 
