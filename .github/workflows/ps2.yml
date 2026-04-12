@@ -21,13 +21,14 @@ jobs:
           docker run --rm \
             -v $(pwd):/src \
             -w /src \
-            -e PS2DEV=/usr/local/ps2dev \
-            -e PS2SDK=/usr/local/ps2dev/ps2sdk \
-            -e PATH="/usr/local/ps2dev/bin:/usr/local/ps2dev/ee/bin:/usr/local/ps2dev/iop/bin:/usr/local/ps2dev/ps2sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            --env PS2DEV=/usr/local/ps2dev \
+            --env PS2SDK=/usr/local/ps2dev/ps2sdk \
+            --env PATH="/usr/local/ps2dev/bin:/usr/local/ps2dev/ee/bin:/usr/local/ps2dev/iop/bin:/usr/local/ps2dev/ps2sdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             ps2dev/ps2dev:latest \
             sh -c "
-              apk add build-base git && \
+              apk add --no-cache build-base git && \
               git config --global --add safe.directory /src && \
+              ls -l /usr/local/ps2dev/ee/bin/ee-gcc && \
               make platform=ps2 -j\$(nproc)
             "
 
