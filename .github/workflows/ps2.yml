@@ -104,3 +104,5 @@ jobs:
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
+          name: avp-ps2-elf
+          path: AVP.ELF
