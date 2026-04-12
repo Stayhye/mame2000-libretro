@@ -170,6 +170,16 @@ else ifeq ($(platform), ngc)
    HAVE_RZLIB := 1
    STATIC_LINKING := 1
 
+else ifeq ($(platform), ps4)
+   TARGET := $(TARGET_NAME)_libretro_ps4.a
+   CC = $(OO_PS4_TOOLCHAIN)/bin/clang
+   CXX = $(OO_PS4_TOOLCHAIN)/bin/clang++
+   AR = $(OO_PS4_TOOLCHAIN)/bin/orbis-ar
+   CFLAGS += -D__PS4__ -DOS_PTHREADS -O3
+   # OpenOrbis headers and libs
+   CFLAGS += -I$(OO_PS4_TOOLCHAIN)/include -I$(OO_PS4_TOOLCHAIN)/include/orbis
+   STATIC_LINKING = 1
+
 # QNX / BLackberry
 else ifeq ($(platform), qnx)
    TARGET = $(TARGET_NAME)_libretro_$(platform).so
