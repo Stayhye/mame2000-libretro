@@ -33,10 +33,12 @@ jobs:
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar && \
               
-              # 3. THE FORCE FIX: Patch the source code directly
-              # We replace signal-based jumps with standard C jumps in sjlj.c
+              # 3. THE DEFINITIVE PATCH: Force Standard C mode in libco
+              # This forces the logic to skip signal-based code entirely
+              sed -i '1i #define _LIBCO_C' src/libretro/libretro-common/libco/libco.c && \
+              sed -i 's/#include <signal.h>/\/\/#include <signal.h>/g' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/sigjmp_buf/jmp_buf/g' src/libretro/libretro-common/libco/sjlj.c && \
-              sed -i 's/sigsetjmp(creating->context, 0)/setjmp(creating->context)/g' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i 's/sigsetjmp/setjmp/g' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/siglongjmp/longjmp/g' src/libretro/libretro-common/libco/sjlj.c && \
               
               # 4. Set Environment
