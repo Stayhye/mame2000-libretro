@@ -33,7 +33,6 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
               # 3. SELECTIVE GHOSTING
-              # We ghost everything EXCEPT the core Capcom/CPS2 files
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' \
@@ -75,34 +74,13 @@ jobs:
 
               # 7. BUILD
               make platform=ps2 clean
-              # Explicitly define CPS2 to ensure the driver is compiled in
               make platform=ps2 CC='ee-gcc -fno-lto -DCPS2' AR=ee-ar -j\$(nproc)
               
-              # Compile our glue
               ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o -Isrc -Isrc/ps2 -Isrc/libretro/libretro-common/include
 
-              # 8. FINAL LINK
+              # 8. FINAL LINK (With Adaptive Pathing)
               REAL_CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
               REAL_LINKFILE=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
-              CPS2_OBJ=\$(find obj -name 'cps2.o' | head -n 1)
-
-              echo '--- LINKING AVP.ELF ---'
-              ee-gcc -fno-lto -T\"\$REAL_LINKFILE\" \
-                -L\"\$PS2SDK/ee/lib\" \
-                -L\$(dirname \"\$REAL_CRT0\") \
-                -o AVP.ELF \
-                \"\$REAL_CRT0\" \
-                ps2_main.o \
-                \"\$CPS2_OBJ\" \
-                mame2000_libretro_ps2.a \
-                -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
               
-              echo '--- SUCCESS ---'
-              ls -lh AVP.ELF
-            "
-
-      - name: Upload ELF
-        uses: actions/upload-artifact@v4
-        with:
-          name: avp-ps2-elf
-          path: AVP.ELF
+              # Find the compiled object anywhere in the directory tree
+              CPS2
