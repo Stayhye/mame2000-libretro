@@ -20,10 +20,8 @@ jobs:
             sh -c "
               set -e
 
-              # 1. INSTALL TOOLS
+              # 1. SETUP ENVIRONMENT
               apk add --no-cache build-base git make
-
-              # 2. TOOLCHAIN & PATHS
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
@@ -32,30 +30,36 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 3. DYNAMIC BACKUP
-              # Find where CPS2 files actually live and back them up
+              # 2. LOCATE AND PROTECT CPS2 FILES
               CPS2_PATH=\$(find src -name 'cps2.c' | head -n 1)
               CAPCOM_PATH=\$(find src -name 'capcom.c' | head -n 1)
-              
-              echo \"Found CPS2 at: \$CPS2_PATH\"
-              echo \"Found Capcom at: \$CAPCOM_PATH\"
               
               cp \"\$CPS2_PATH\" /tmp/cps2_real.c
               cp \"\$CAPCOM_PATH\" /tmp/capcom_real.c
               
-              # 4. GHOSTING
+              # 3. GHOSTING (Wipe other drivers to save space)
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' -exec cp /tmp/ghost.c {} \;
               done
 
-              # Restore the real hardware files
+              # Restore AvP hardware
               cp /tmp/cps2_real.c \"\$CPS2_PATH\"
               cp /tmp/capcom_real.c \"\$CAPCOM_PATH\"
               
-              # 5. OVERWRITE THE DRIVER LIST
-              # Using the same name found earlier for consistency
-              printf '#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
+              # 4. OVERWRITE DRIVER LIST (AvP Only)
+              echo '#include \"driver.h\"' > src/driver.c
+              echo 'extern struct GameDriver driver_avp;' >> src/driver.c
+              echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/driver.c
 
-              # 6. FIX LIBCO
-              CO_DIR='src/libretro/
+              # 5. FIX LIBCO
+              CO_DIR='src/libretro/libretro-common/libco'
+              mkdir -p \$CO_DIR
+              cat <<EOF > \$CO_DIR/sjlj.c
+              #include <setjmp.h>
+              #include <stdlib.h>
+              #include \"libco.h\"
+              typedef struct { jmp_buf context; } sjlj_thread_t;
+              static sjlj_thread_t *co_running = NULL;
+              cothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }
+              cothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj
