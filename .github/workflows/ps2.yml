@@ -13,55 +13,65 @@ jobs:
 
       - name: Compile and Link ELF
         run: |
-          docker run --rm \
-            -v $(pwd):/src \
-            -w /src \
-            ps2dev/ps2dev:latest \
-            sh -c "
-              set -e
+          # 1. We create the build script OUTSIDE of the Docker run command
+          # This avoids the "Unexpected EOF" quoting hell.
+          cat > local_build.sh << 'EOF_BUILD'
+          set -e
+          apk add --no-cache build-base git make
+          export PS2DEV=/usr/local/ps2dev
+          export PS2SDK=$PS2DEV/ps2sdk
+          export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
+          
+          # Setup toolchain links
+          ln -sf $PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
+          ln -sf $PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
+          ln -sf $PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 1. SETUP & TOOLS
-              apk add --no-cache build-base git make
-              export PS2DEV=/usr/local/ps2dev
-              export PS2SDK=\$PS2DEV/ps2sdk
-              export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
-              
-              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
-              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
-              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
+          # 2. Adaptive Discovery
+          CPS2_PATH=$(find src -name 'cps2.c' | head -n 1)
+          CAPCOM_PATH=$(find src -name 'capcom.c' | head -n 1)
+          
+          cp "$CPS2_PATH" /tmp/cps2_real.c
+          cp "$CAPCOM_PATH" /tmp/capcom_real.c
+          
+          # 3. Ghosting
+          echo 'void ghost_stub(void) {}' > /tmp/ghost.c
+          for d in $(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
+            find "$d" -name '*.c' -exec cp /tmp/ghost.c {} \;
+          done
 
-              # 2. DYNAMICALLY FIND CAPCOM HARDWARE
-              CPS2_PATH=\$(find src -name 'cps2.c' | head -n 1)
-              CAPCOM_PATH=\$(find src -name 'capcom.c' | head -n 1)
-              
-              echo \"Path Discovery: CPS2 -> \$CPS2_PATH | CAPCOM -> \$CAPCOM_PATH\"
-              
-              cp \"\$CPS2_PATH\" /tmp/cps2_real.c
-              cp \"\$CAPCOM_PATH\" /tmp/capcom_real.c
-              
-              # 3. GHOSTING (Space Optimization)
-              echo 'void ghost_stub(void) {}' > /tmp/ghost.c
-              for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
-                find \"\$d\" -name '*.c' -exec cp /tmp/ghost.c {} \;
-              done
+          # Restore
+          cp /tmp/cps2_real.c "$CPS2_PATH"
+          cp /tmp/capcom_real.c "$CAPCOM_PATH"
+          
+          # 4. Overwrite Driver List
+          echo '#include "driver.h"' > src/driver.c
+          echo 'extern struct GameDriver driver_avp;' >> src/driver.c
+          echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/driver.c
 
-              # Restore AvP hardware
-              cp /tmp/cps2_real.c \"\$CPS2_PATH\"
-              cp /tmp/capcom_real.c \"\$CAPCOM_PATH\"
-              
-              # 4. OVERWRITE DRIVER LIST
-              echo '#include \"driver.h\"' > src/driver.c
-              echo 'extern struct GameDriver driver_avp;' >> src/driver.c
-              echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/driver.c
+          # 5. Build Core
+          make platform=ps2 clean
+          make platform=ps2 CC='ee-gcc -fno-lto' AR=ee-ar -j$(nproc)
 
-              # 5. GLUE FILE (Safe Redirects)
-              echo '#include <stdio.h>' > ps2_main.c
-              echo '#include <stddef.h>' >> ps2_main.c
-              echo '#include <stdbool.h>' >> ps2_main.c
-              echo 'size_t spriteram_size = 0, spriteram_2_size = 0;' >> ps2_main.c
-              echo 'unsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;' >> ps2_main.c
-              echo 'float vector_get_intensity(void) { return 1.0f; }' >> ps2_main.c
-              echo 'void vector_set_intensity(float i) { }' >> ps2_main.c
-              echo 'void path_basedir(char *p) { if(p) p[0] = 0; }' >> ps2_main.c
-              echo 'bool path_mkdir(const char *d) { return true; }' >> ps2_main.c
-              echo 'extern int run_game(int i);'
+          # 6. Final Glue & Link
+          echo '#include <stdio.h>
+          #include <stddef.h>
+          #include <stdbool.h>
+          size_t spriteram_size = 0, spriteram_2_size = 0;
+          unsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;
+          float vector_get_intensity(void) { return 1.0f; }
+          void vector_set_intensity(float i) { }
+          void path_basedir(char *p) { if(p) p[0] = 0; }
+          bool path_mkdir(const char *d) { return true; }
+          extern int run_game(int i);
+          int main(int c, char **v) { return run_game(0); }' > ps2_main.c
+
+          INC="-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include"
+          ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o $INC
+          ee-gcc -fno-lto -c "$CPS2_PATH" -o cps2.o $INC -DCPS2
+          ee-gcc -fno-lto -c "$CAPCOM_PATH" -o capcom.o $INC -DCPS2
+
+          CRT0=$(find $PS2DEV -name 'crt0.o' | head -n 1)
+          LNK=$(find $PS2DEV -name 'linkfile' | head -n 1)
+          
+          ee-gcc -fno-lto -T"$L
