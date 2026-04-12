@@ -170,31 +170,16 @@ else ifeq ($(platform), ngc)
    HAVE_RZLIB := 1
    STATIC_LINKING := 1
 
-else ifeq ($(platform), ps4)
-   TARGET := $(TARGET_NAME)_libretro_ps4.a
-   CC = $(OO_PS4_TOOLCHAIN)/bin/clang
-   CXX = $(OO_PS4_TOOLCHAIN)/bin/clang++
-   AR = $(OO_PS4_TOOLCHAIN)/bin/orbis-ar
-   CFLAGS += -D__PS4__ -DOS_PTHREADS -O3
-   # OpenOrbis headers and libs
-   CFLAGS += -I$(OO_PS4_TOOLCHAIN)/include -I$(OO_PS4_TOOLCHAIN)/include/orbis
+else ifeq ($(platform), ps2)
+   TARGET := $(TARGET_NAME)_libretro_ps2.a
+   CC = ee-gcc
+   CXX = ee-g++
+   AR = ee-ar
+   DEFINES += -Dext_ps2 -DIPS2 -DGEKKO -D__PS2__ -D__PLAYSTATION2__
+   CFLAGS += -O2 -G0 -fno-strict-aliasing
+   # PS2 is 32-bit but needs specific alignment
+   COMMONFLAGS += -march=r5900 -mabi=eabi
    STATIC_LINKING = 1
-
-# QNX / BLackberry
-else ifeq ($(platform), qnx)
-   TARGET = $(TARGET_NAME)_libretro_$(platform).so
-
-   CFLAGS += -fPIC 
-   PLATCFLAGS += -march=armv7-a -Dstricmp=strcasecmp
-   LDFLAGS += -fPIC -shared -Wl,--version-script=link.T
-
-ifneq ($(WANT_LIBCO), 1)
-	SHARED += -lpthread
-endif
-
-   CC = qcc -Vgcc_ntoarmv7le
-   AR = qcc -Vgcc_ntoarmv7le
-   LD = QCC -Vgcc_ntoarmv7le
 
 # Nintendo Wii
 else ifeq ($(platform), wii)
@@ -206,21 +191,6 @@ else ifeq ($(platform), wii)
    PLATFORM_DEFINES += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
    HAVE_RZLIB := 1
    STATIC_LINKING := 1
-
-# Nintendo Switch (libnx)
-else ifeq ($(platform), libnx)
-include $(DEVKITPRO)/libnx/switch_rules
-    EXT=a
-    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
-    DEFINES := -DSWITCH=1 -U__linux__ -U__linux
-    CFLAGS := $(DEFINES) -g -O3 -fPIE -I$(LIBNX)/include/ -ffunction-sections -fdata-sections -fcommon -ftls-model=local-exec -Wl,--allow-multiple-definition -specs=$(LIBNX)/switch.specs
-    CFLAGS += $(INCDIRS)
-    CFLAGS	+=	$(INCLUDE)  -D__SWITCH__
-    CXXFLAGS := $(ASFLAGS) $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
-    CFLAGS += -std=gnu11
-    PLATCFLAGS += -Dstricmp=strcasecmp
-   HAVE_RZLIB := 1
-    STATIC_LINKING = 1
 
 # Nintendo WiiU
 else ifeq ($(platform), wiiu)
