@@ -20,22 +20,17 @@ jobs:
             sh -c "
               set -e
 
-              # 1. SETUP ENVIRONMENT
+              # 1. TOOLCHAIN ALIASING
+              # This fixes the 'ee-gcc: No such file' error
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
               
-              # Hardcoded paths for the standard ps2dev docker image
-              # This prevents the 'dirname' and 'find' crashes
-              CRT0_OBJ=\$PS2SDK/ee/startup/crt0.o
-              LINKFILE=\$PS2SDK/ee/startup/linkfile
+              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
+              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
+              ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 2. INSTALL MINIMAL ZLIB
-              # Instead of the full ports repo, we use the build-in apk to get headers 
-              # and then symlink the library if it exists, or build a tiny static one.
-              apk add --no-cache build-base git zlib-dev
-              
-              # 3. GHOSTING DRIVERS (Keeping it at 5.84MB)
+              # 2. GHOSTING DRIVERS (Maintaining the 5.84MB size)
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' -exec cp /tmp/ghost.c {} \;
@@ -45,32 +40,28 @@ jobs:
               echo 'extern struct GameDriver driver_avp;' >> src/drivers.c
               echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/drivers.c
 
-              # 4. FIX LIBCO
+              # 3. FIX LIBCO
               CO_DIR='src/libretro/libretro-common/libco'
               mkdir -p \$CO_DIR
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # 5. COMPILE CORE
+              # 4. COMPILE CORE
+              # We pass CC and AR directly to ensure the Makefile uses our aliases
               make platform=ps2 clean
-              make platform=ps2 -j\$(nproc)
+              make platform=ps2 CC=ee-gcc AR=ee-ar -j\$(nproc)
 
-              # 6. FINAL LINK
-              # We use the explicit compiler name and standard library flags
+              # 5. FINAL LINK
               echo '--- LINKING AVP.ELF ---'
-              mips64r5900el-ps2-elf-gcc -T\$LINKFILE \
-                -L\$PS2SDK/ee/lib \
-                -L\$PS2DEV/ee/lib/gcc/mips64r5900el-ps2-elf/15.2.0 \
+              CRT0_OBJ=\$PS2SDK/ee/startup/crt0.o
+              LINKFILE=\$PS2SDK/ee/startup/linkfile
+              
+              ee-gcc -T\$LINKFILE -L\$PS2SDK/ee/lib \
                 -o AVP.ELF \
                 \$CRT0_OBJ \
                 mame2000_libretro_ps2.a \
-                -lpatches -ldebug -lstdc++ -lc -lm -lkernel || echo 'Link failed - check missing symbols'
+                -lpatches -ldebug -lstdc++ -lc -lm -lkernel
               
-              # If AVP.ELF doesn't exist, we link without -lz just to see if it's the culprit
-              if [ ! -f AVP.ELF ]; then
-                mips64r5900el-ps2-elf-gcc -T\$LINKFILE -L\$PS2SDK/ee/lib -o AVP.ELF \$CRT0_OBJ mame2000_libretro_ps2.a -lpatches -ldebug -lstdc++ -lc -lm -lkernel
-              fi
-
               ls -lh AVP.ELF
             "
 
