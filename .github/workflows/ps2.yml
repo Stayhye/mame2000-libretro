@@ -1,0 +1,27 @@
+name: Build MAME 2000 PS2
+
+on: [push, pull_request]
+
+jobs:
+  build-ps2:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          apk add build-base git
+          # You might need to install ps2-pkgs if MAME uses SDL/Zlib
+          # pspkgs install zlib
+
+      - name: Compile
+        run: |
+          make platform=ps2 -j$(nproc)
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: mame2000_ps2_elf
+          path: "*.elf"
