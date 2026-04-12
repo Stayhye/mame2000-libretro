@@ -9,15 +9,20 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # This ensures the .git folder is actually present
+          fetch-depth: 0
+          submodules: recursive
 
       - name: Install Dependencies
         run: |
           apk add build-base git
-          # You might need to install ps2-pkgs if MAME uses SDL/Zlib
-          # pspkgs install zlib
+          # Tell git that this directory is safe, even if owned by a different user
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Compile
         run: |
+          # Use the environment's processors to speed up build
           make platform=ps2 -j$(nproc)
 
       - name: Upload ELF
