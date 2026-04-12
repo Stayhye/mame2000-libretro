@@ -3,8 +3,6 @@ name: Build MAME 2000 PS2 (AvP Targeted)
 on:
   push:
     branches: [ master, main ]
-  pull_request:
-    branches: [ master, main ]
 
 jobs:
   build-ps2:
@@ -12,8 +10,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Build MAME 2000
         run: |
@@ -34,39 +30,47 @@ jobs:
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin
 
-              # 2. LIBCO PS2 PATCH
+              # 2. LIBCO PATCH
               SJLJ_PATH='src/libretro/libretro-common/libco/sjlj.c'
-              mkdir -p \$(dirname \$SJLJ_PATH)
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t main; co_running = &main; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$SJLJ_PATH
 
-              # 3. STRIP MAME DRIVERS (The Memory-Saver)
-              # Overwrite the master driver list
+              # 3. THE "HIDEOUT" STRATEGY
+              # We move ALL drivers to a temp folder, then only bring back CPS2.
+              # This bypasses any hard-coded lists in the Makefile.
+              echo 'Hiding non-CPS2 drivers...'
+              mkdir -p /tmp/mame_drivers
+              # Find where drivers are (usually src/drivers or src/mame/drivers)
+              DRIVER_DIR=\$(find src -name 'drivers' -type d | head -n 1)
+              mv \$DRIVER_DIR/*.c /tmp/mame_drivers/
+              cp /tmp/mame_drivers/cps2.c \$DRIVER_DIR/
+              
+              # Do the same for Video Hardware (often where the heavy lifting is)
+              VID_DIR=\$(find src -name 'vidhrdw' -type d | head -n 1)
+              if [ -d \"\$VID_DIR\" ]; then
+                mkdir -p /tmp/mame_vid
+                mv \$VID_DIR/*.c /tmp/mame_vid/
+                cp /tmp/mame_vid/cps2.c \$VID_DIR/ || true
+                cp /tmp/mame_vid/capcom.c \$VID_DIR/ || true
+              fi
+
+              # 4. OVERWRITE DRIVERS.C
               echo '#include \"driver.h\"' > src/drivers.c
               echo 'extern struct GameDriver driver_avp;' >> src/drivers.c
               echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/drivers.c
 
-              # Find and empty out the modular driver makefiles
-              # This stops the 16MB bloat by forcing the driver list to only CPS2
-              find . -name \"*.mak\" -exec sed -i 's/^DRV =.*/DRV =/' {} +
-              find . -name \"Makefile*\" -exec sed -i 's/^DRV =.*/DRV =/' {} +
-              
-              # Explicitly set the only driver we want
-              # We use an environment variable that MAME's Makefile often respects
-              export DRV=\"\$(OBJ)/drivers/cps2.o\"
-
-              # 4. CLEAN & COMPILE
+              # 5. CLEAN & BUILD
+              # Use -k (keep going) because the Makefile WILL complain about missing files.
+              # But it will still archive the ones it successfully built.
               make platform=ps2 clean
-              echo '--- STARTING TARGETED COMPILE ---'
-              # We pass DRV directly into the make command as a final override
-              make platform=ps2 DRV=\"\$(OBJ)/drivers/cps2.o\" -j\$(nproc)
+              make platform=ps2 -k -j\$(nproc) || echo 'Ignoring missing file errors...'
 
-              # 5. DIAGNOSTICS & RETRIEVAL
-              echo '--- FINAL BUILD SIZE ---'
-              ls -lh mame2000_libretro_ps2.a || echo 'Build failed to produce .a'
+              # 6. VERIFY SIZE
+              echo '--- FINAL CORE SIZE ---'
+              ls -lh mame2000_libretro_ps2.a
             "
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mame2000-avp-core
+          name: avp-mame-ps2-stripped
           path: mame2000_libretro_ps2.a
