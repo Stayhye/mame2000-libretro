@@ -33,7 +33,7 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
               # 3. SELECTIVE GHOSTING
-              # We ghost everything EXCEPT the CPS2/Capcom hardware files
+              # We ghost everything EXCEPT the core Capcom/CPS2 files
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' \
@@ -53,29 +53,21 @@ jobs:
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
               # 6. COMPREHENSIVE GLUE FILE
-              # Added spriteram_2_size and Vector intensity stubs
               echo '
               #include <stdio.h>
               #include <stddef.h>
               #include <stdbool.h>
-
-              // MAME Core Symbols
               size_t spriteram_size = 0;
               size_t spriteram_2_size = 0;
               unsigned char *spriteram = NULL;
               unsigned char *buffered_spriteram = NULL;
               unsigned char *spriteram_2 = NULL;
               unsigned char *buffered_spriteram_2 = NULL;
-
-              // Vector Stubs
               unsigned char *CinemaVectorData = NULL;
               float vector_get_intensity(void) { return 1.0f; }
               void vector_set_intensity(float i) { }
-
-              // Libretro Path Stubs
               void path_basedir(char *path) { if (path) path[0] = 0; }
               bool path_mkdir(const char *dir) { return true; }
-
               extern int run_game(int game_index); 
               int main(int argc, char *argv[]) {
                   return run_game(0); 
@@ -83,12 +75,16 @@ jobs:
 
               # 7. BUILD
               make platform=ps2 clean
-              make platform=ps2 CC='ee-gcc -fno-lto' AR=ee-ar -j\$(nproc)
+              # Explicitly define CPS2 to ensure the driver is compiled in
+              make platform=ps2 CC='ee-gcc -fno-lto -DCPS2' AR=ee-ar -j\$(nproc)
+              
+              # Compile our glue
               ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o -Isrc -Isrc/ps2 -Isrc/libretro/libretro-common/include
 
-              # 8. LINK
+              # 8. FINAL LINK (Explicitly adding the CPS2 object just in case)
               REAL_CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
               REAL_LINKFILE=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
+              CPS2_OBJ=\$(find obj -name 'cps2.o' | head -n 1)
 
               echo '--- LINKING AVP.ELF ---'
               ee-gcc -fno-lto -T\"\$REAL_LINKFILE\" \
@@ -97,6 +93,7 @@ jobs:
                 -o AVP.ELF \
                 \"\$REAL_CRT0\" \
                 ps2_main.o \
+                \"\$CPS2_OBJ\" \
                 mame2000_libretro_ps2.a \
                 -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
               
