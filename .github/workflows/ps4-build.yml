@@ -9,23 +9,26 @@ on:
 jobs:
   build-ps4:
     runs-on: ubuntu-latest
-    # This image is more reliable and includes the full OpenOrbis environment
-    container: ghcr.io/moms-friendly-development-community/orbis-toolchain:latest
-    
+    # We use the specific OpenOrbis image. If 'latest' fails, we pull the specific SHA.
+    container: ghcr.io/openorbis/toolchain:v1.1.0
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Build Libretro Core
         run: |
-          # In this container, the toolchain is pre-configured
-          # We force the platform to ps4 for the MAME Makefile
+          # Set the toolchain path so the compiler can find its headers
+          export OO_PS4_TOOLCHAIN=/usr/local/openorbis
+          
+          # Force the compiler to be orbis-clang
+          # We use platform=ps4 which corresponds to your Makefile block
           make platform=ps4 -j$(nproc)
 
-      - name: Upload Artifact
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mame2000_ps4
+          name: mame2000_ps4_libretro
           path: |
             *.a
             *.elf
