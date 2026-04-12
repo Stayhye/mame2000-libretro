@@ -13,33 +13,33 @@ jobs:
 
       - name: Generate Build Script
         run: |
+          # 1. Create the shell script header
           echo "set -e" > local_build.sh
           echo "apk add --no-cache build-base git make" >> local_build.sh
           echo "export PS2DEV=/usr/local/ps2dev" >> local_build.sh
           echo "export PS2SDK=\$PS2DEV/ps2sdk" >> local_build.sh
           echo "export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin" >> local_build.sh
+          
+          # 2. Toolchain Symlinks
           echo "ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc" >> local_build.sh
           echo "ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++" >> local_build.sh
           echo "ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar" >> local_build.sh
+          
+          # 3. Adaptive Path Discovery & Protection
           echo "CPS2_PATH=\$(find src -name 'cps2.c' | head -n 1)" >> local_build.sh
           echo "CAPCOM_PATH=\$(find src -name 'capcom.c' | head -n 1)" >> local_build.sh
           echo "cp \"\$CPS2_PATH\" /tmp/cps2_real.c" >> local_build.sh
           echo "cp \"\$CAPCOM_PATH\" /tmp/capcom_real.c" >> local_build.sh
+          
+          # 4. Ghosting Pass
           echo "echo 'void ghost_stub(void) {}' > /tmp/ghost.c" >> local_build.sh
           echo "for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do find \"\$d\" -name '*.c' -exec cp /tmp/ghost.c {} \; ; done" >> local_build.sh
+          
+          # 5. Restore AvP Hardware
           echo "cp /tmp/cps2_real.c \"\$CPS2_PATH\"" >> local_build.sh
           echo "cp /tmp/capcom_real.c \"\$CAPCOM_PATH\"" >> local_build.sh
+          
+          # 6. Driver List Overwrite
           echo "echo '#include \"driver.h\"' > src/driver.c" >> local_build.sh
           echo "echo 'extern struct GameDriver driver_avp;' >> src/driver.c" >> local_build.sh
-          echo "echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/driver.c" >> local_build.sh
-          echo "make platform=ps2 clean" >> local_build.sh
-          echo "make platform=ps2 CC='ee-gcc -fno-lto' AR=ee-ar -j\$(nproc)" >> local_build.sh
-          echo "echo '#include <stdio.h>
-          #include <stddef.h>
-          #include <stdbool.h>
-          size_t spriteram_size = 0, spriteram_2_size = 0;
-          unsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;
-          float vector_get_intensity(void) { return 1.0f; }
-          void vector_set_intensity(float i) { }
-          void path_basedir(char *p) { if(p) p[0] = 0; }
-          bool path_mkdir(const char *d) { return true; }
+          echo "echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/driver.c" >>
