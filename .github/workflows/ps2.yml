@@ -20,42 +20,43 @@ jobs:
             -w /src \
             ps2dev/ps2dev:latest \
             sh -c "
-              # 1. SETUP
-              apk add --no-cache build-base git && \
-              export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;) && \
-              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc && \
-              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
-              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar && \
-              export PS2DEV=/usr/local/ps2dev && \
-              export PS2SDK=\$PS2DEV/ps2sdk && \
-              export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin && \
+              set -e # Exit immediately if a command fails
               
-              # 2. FORCE MINIMAL DRIVER LIST
-              # This nukes the 16MB of extra drivers and keeps ONLY AvP
-              # We use the internal MAME naming convention for AvP (CPS2)
-              cat <<EOF > src/drivers.c
-              #include \"driver.h\"
+              # 1. SETUP TOOLS
+              apk add --no-cache build-base git
+              
+              # 2. TOOLCHAIN PATHS
+              export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;)
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
+              ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
+              export PS2DEV=/usr/local/ps2dev
+              export PS2SDK=\$PS2DEV/ps2sdk
+              export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin
+              
+              # 3. FORCE MINIMAL DRIVER LIST (AvP ONLY)
+              # Overwriting drivers.c to remove 14MB+ of useless drivers
+              echo '#include \"driver.h\"' > src/drivers.c
+              echo 'extern struct GameDriver driver_avp;' >> src/drivers.c
+              echo 'extern struct GameDriver driver_avpu;' >> src/drivers.c
+              echo 'extern struct GameDriver driver_avpj;' >> src/drivers.c
+              echo 'const struct GameDriver *drivers[] = { &driver_avp, &driver_avpu, &driver_avpj, 0 };' >> src/drivers.c
 
-              extern struct GameDriver driver_avp;
-              extern struct GameDriver driver_avpu;
-              extern struct GameDriver driver_avpj;
-
-              const struct GameDriver *drivers[] = {
-                  &driver_avp,  /* Alien vs. Predator (Euro 940520) */
-                  &driver_avpu, /* Alien vs. Predator (USA 940520) */
-                  &driver_avpj, /* Alien vs. Predator (Japan 940520) */
-                  0
-              };
-              EOF
-
-              # 3. LIBCO OVERRIDE (Already proven to work)
+              # 4. LIBCO PATCH (Required for PS2)
               SJLJ_PATH='src/libretro/libretro-common/libco/sjlj.c'
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t main; co_running = &main; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$SJLJ_PATH
 
-              # 4. BUILD
-              # We use -B to force a rebuild of the driver list
+              # 5. START BUILD
+              echo '--- STARTING COMPILE ---'
               make platform=ps2 -B -j\$(nproc)
-
-              # 5. RETRIEVAL
+              
+              # 6. VERIFY & MOVE
+              echo '--- BUILD FINISHED ---'
               ls -lh mame2000_libretro_ps2.a
             "
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avp-mame-library
+          path: mame2000_libretro_ps2.a
