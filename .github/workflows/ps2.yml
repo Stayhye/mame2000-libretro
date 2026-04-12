@@ -33,10 +33,18 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
               # 3. SELECTIVE GHOSTING
+              # Back up the real files before ghosting wipes them
+              cp src/drivers/capcom/cps2.c /tmp/cps2_real.c
+              cp src/drivers/capcom/capcom.c /tmp/capcom_real.c
+              
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
-                find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' ! -name 'common.c' -exec cp /tmp/ghost.c {} \;
+                find \"\$d\" -name '*.c' -exec cp /tmp/ghost.c {} \;
               done
+
+              # Restore the real hardware files
+              cp /tmp/cps2_real.c src/drivers/capcom/cps2.c
+              cp /tmp/capcom_real.c src/drivers/capcom/capcom.c
               
               # 4. OVERWRITE THE DRIVER LIST
               printf '#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
@@ -61,26 +69,21 @@ jobs:
               extern int run_game(int game_index); 
               int main(int argc, char *argv[]) { return run_game(0); }' > ps2_main.c
 
-              # 7. BUILD
+              # 7. BUILD MAME ARCHIVE
               make platform=ps2 clean
-              make platform=ps2 CC='ee-gcc -fno-lto -DCPS2' AR=ee-ar -j\$(nproc)
-              ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o -Isrc -Isrc/ps2 -Isrc/libretro/libretro-common/include
+              make platform=ps2 CC='ee-gcc -fno-lto' AR=ee-ar -j\$(nproc)
 
-              # 8. IMPROVED SEARCH FOR OBJECTS
+              # 8. MANUALLY COMPILE HARDWARE OBJECTS
+              # This bypasses the Makefile's filter
+              INC=\"-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include\"
+              ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o \$INC
+              ee-gcc -fno-lto -c src/drivers/capcom/cps2.c -o cps2.o \$INC -DCPS2
+              ee-gcc -fno-lto -c src/drivers/capcom/capcom.c -o capcom.o \$INC -DCPS2
+
+              # 9. FINAL LINK
               REAL_CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
               REAL_LINKFILE=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
               
-              # Search specifically for the cps2 object within the current build dir
-              CPS2_OBJ=\$(find . -name 'cps2.o' | head -n 1)
-              
-              echo \"Linker Debug: CRT0=\$REAL_CRT0, LINK=\$REAL_LINKFILE, CPS2=\$CPS2_OBJ\"
-
-              # Link only if the required object was found
-              if [ -z \"\$CPS2_OBJ\" ]; then
-                echo \"FATAL: cps2.o not found. Compilation might have failed.\"
-                exit 1
-              fi
-
               echo '--- LINKING AVP.ELF ---'
               ee-gcc -fno-lto -T\"\$REAL_LINKFILE\" \
                 -L\"\$PS2SDK/ee/lib\" \
@@ -88,7 +91,8 @@ jobs:
                 -o AVP.ELF \
                 \"\$REAL_CRT0\" \
                 ps2_main.o \
-                \"\$CPS2_OBJ\" \
+                cps2.o \
+                capcom.o \
                 mame2000_libretro_ps2.a \
                 -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
               
