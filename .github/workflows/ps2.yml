@@ -32,76 +32,30 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 3. SELECTIVE GHOSTING
-              # Back up the real files before ghosting wipes them
-              cp src/drivers/capcom/cps2.c /tmp/cps2_real.c
-              cp src/drivers/capcom/capcom.c /tmp/capcom_real.c
+              # 3. DYNAMIC BACKUP
+              # Find where CPS2 files actually live and back them up
+              CPS2_PATH=\$(find src -name 'cps2.c' | head -n 1)
+              CAPCOM_PATH=\$(find src -name 'capcom.c' | head -n 1)
               
+              echo \"Found CPS2 at: \$CPS2_PATH\"
+              echo \"Found Capcom at: \$CAPCOM_PATH\"
+              
+              cp \"\$CPS2_PATH\" /tmp/cps2_real.c
+              cp \"\$CAPCOM_PATH\" /tmp/capcom_real.c
+              
+              # 4. GHOSTING
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' -exec cp /tmp/ghost.c {} \;
               done
 
               # Restore the real hardware files
-              cp /tmp/cps2_real.c src/drivers/capcom/cps2.c
-              cp /tmp/capcom_real.c src/drivers/capcom/capcom.c
+              cp /tmp/cps2_real.c \"\$CPS2_PATH\"
+              cp /tmp/capcom_real.c \"\$CAPCOM_PATH\"
               
-              # 4. OVERWRITE THE DRIVER LIST
+              # 5. OVERWRITE THE DRIVER LIST
+              # Using the same name found earlier for consistency
               printf '#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
 
-              # 5. FIX LIBCO
-              CO_DIR='src/libretro/libretro-common/libco'
-              mkdir -p \$CO_DIR
-              printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
-              cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
-
-              # 6. GLUE FILE
-              echo '
-              #include <stdio.h>
-              #include <stddef.h>
-              #include <stdbool.h>
-              size_t spriteram_size = 0, spriteram_2_size = 0;
-              unsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;
-              float vector_get_intensity(void) { return 1.0f; }
-              void vector_set_intensity(float i) { }
-              void path_basedir(char *path) { if (path) path[0] = 0; }
-              bool path_mkdir(const char *dir) { return true; }
-              extern int run_game(int game_index); 
-              int main(int argc, char *argv[]) { return run_game(0); }' > ps2_main.c
-
-              # 7. BUILD MAME ARCHIVE
-              make platform=ps2 clean
-              make platform=ps2 CC='ee-gcc -fno-lto' AR=ee-ar -j\$(nproc)
-
-              # 8. MANUALLY COMPILE HARDWARE OBJECTS
-              # This bypasses the Makefile's filter
-              INC=\"-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include\"
-              ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o \$INC
-              ee-gcc -fno-lto -c src/drivers/capcom/cps2.c -o cps2.o \$INC -DCPS2
-              ee-gcc -fno-lto -c src/drivers/capcom/capcom.c -o capcom.o \$INC -DCPS2
-
-              # 9. FINAL LINK
-              REAL_CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
-              REAL_LINKFILE=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
-              
-              echo '--- LINKING AVP.ELF ---'
-              ee-gcc -fno-lto -T\"\$REAL_LINKFILE\" \
-                -L\"\$PS2SDK/ee/lib\" \
-                -L\$(dirname \"\$REAL_CRT0\") \
-                -o AVP.ELF \
-                \"\$REAL_CRT0\" \
-                ps2_main.o \
-                cps2.o \
-                capcom.o \
-                mame2000_libretro_ps2.a \
-                -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
-              
-              echo '--- SUCCESS ---'
-              ls -lh AVP.ELF
-            "
-
-      - name: Upload ELF
-        uses: actions/upload-artifact@v4
-        with:
-          name: avp-ps2-elf
-          path: AVP.ELF
+              # 6. FIX LIBCO
+              CO_DIR='src/libretro/
