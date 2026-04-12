@@ -23,29 +23,32 @@ jobs:
             -w /src \
             ps2dev/ps2dev:latest \
             sh -c "
-              # 1. Install basics
+              # 1. Install necessary build tools
               apk add --no-cache build-base git && \
+              
+              # 2. Fix the Git ownership security check
               git config --global --add safe.directory /src && \
               
-              # 2. Dynamic Toolchain Discovery
-              # We find where the mips compilers are and link them to legacy names
+              # 3. Dynamic Toolchain Discovery (Find the modern compiler)
               export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;) && \
-              echo \"Found toolchain at: \$EE_BIN_PATH\" && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar && \
               
-              # 3. Set Environment
+              # 4. Set Environment Variables for PS2SDK
               export PS2DEV=/usr/local/ps2dev && \
               export PS2SDK=\$PS2DEV/ps2sdk && \
-              export PATH=\$PATH:/usr/local/bin:\$PS2DEV/bin:\$PS2SDK/bin && \
+              export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin && \
               
-              # 4. Compile
-              make platform=ps2 -j\$(nproc)
+              # 5. Compile with the libco/SJLJ fix
+              # We inject the defines directly into the make command
+              make platform=ps2 CFLAGS=\"-D_EE -O2 -G0 -fno-strict-aliasing -DLIBCO_SJLJ -D_LIBCO_C\" -j\$(nproc)
             "
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mame2000_ps2_elf
-          path: "*.elf"
+          path: |
+            *.elf
+            *.a
