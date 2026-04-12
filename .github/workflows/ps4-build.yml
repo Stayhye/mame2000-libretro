@@ -9,8 +9,8 @@ on:
 jobs:
   build-ps4:
     runs-on: ubuntu-latest
-    # Using the community-maintained container which is more reliable for Actions
-    container: ghcr.io/openorbis/toolchain:latest
+    # This image is more reliable and includes the full OpenOrbis environment
+    container: ghcr.io/moms-friendly-development-community/orbis-toolchain:latest
     
     steps:
       - name: Checkout Code
@@ -18,22 +18,14 @@ jobs:
 
       - name: Build Libretro Core
         run: |
-          # The toolchain is usually pre-configured in /opt/ext-toolchain
-          # but we'll set the path just in case
-          export OO_PS4_TOOLCHAIN=/opt/ext-toolchain
+          # In this container, the toolchain is pre-configured
+          # We force the platform to ps4 for the MAME Makefile
           make platform=ps4 -j$(nproc)
-
-      - name: Package as ELF
-        run: |
-          # If your makefile produces a .elf, we prepare it here
-          # This is the step where you'd eventually use 'create-eboot'
-          echo "Packaging build..."
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mame2000_ps4_build
+          name: mame2000_ps4
           path: |
             *.a
             *.elf
-            *.prx
