@@ -16,11 +16,12 @@ jobs:
           submodules: recursive
 
       - name: Build inside ps2dev container
-        # We run the actual build command INSIDE the container here
         run: |
           docker run --rm -v $(pwd):/src -w /src ps2dev/ps2dev:latest \
-          sh -c "apk add build-base git && make platform=ps2 -j$(nproc)"
-
+          sh -c "apk add build-base git && \
+                 git config --global --add safe.directory /src && \
+                 make platform=ps2 -j$(nproc)"
+                 
       - name: Upload ELF
         uses: actions/upload-artifact@v4
         with:
