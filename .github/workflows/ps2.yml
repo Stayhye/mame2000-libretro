@@ -33,18 +33,22 @@ jobs:
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar && \
               
-              # 3. THE FINAL LIBCO PATCH:
-              # We disable the POSIX signal logic at the preprocessor level.
-              # This forces sjlj.c to only use standard setjmp/longjmp.
+              # 3. THE LOGICAL PATCH:
+              # Force Standard C mode and strip POSIX signal usage
               sed -i '1i #define _LIBCO_C' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/#include <signal.h>/\/\/#include <signal.h>/g' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/sigjmp_buf/jmp_buf/g' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/sigsetjmp(\([^,]*\), [01])/setjmp(\1)/g' src/libretro/libretro-common/libco/sjlj.c && \
               sed -i 's/siglongjmp/longjmp/g' src/libretro/libretro-common/libco/sjlj.c && \
               
-              # Comment out the entire sigaction/sigaltstack block (lines 50 to 90 roughly)
-              # This stops the 'stack_t' and 'SA_ONSTACK' errors.
-              sed -i '50,90s/^\(.*\)$/\/\/\1/' src/libretro/libretro-common/libco/sjlj.c && \
+              # Comment out lines containing POSIX-only types/functions to keep 'thread' alive
+              sed -i '/stack_t/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/sigaction/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/sigaltstack/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/sigemptyset/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/SA_ONSTACK/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/SIGUSR1/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
+              sed -i '/raise(/s/^/\/\//' src/libretro/libretro-common/libco/sjlj.c && \
 
               # 4. Set Environment
               export PS2DEV=/usr/local/ps2dev && \
