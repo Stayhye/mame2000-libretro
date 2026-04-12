@@ -32,10 +32,15 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 3. GHOSTING & PURGING (The 5.84MB Logic)
+              # 3. SELECTIVE GHOSTING
+              # We ghost everything EXCEPT the CPS2/Capcom hardware files
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
-                find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' -exec cp /tmp/ghost.c {} \;
+                find \"\$d\" -name '*.c' \
+                  ! -name 'cps2.c' \
+                  ! -name 'capcom.c' \
+                  ! -name 'common.c' \
+                  -exec cp /tmp/ghost.c {} \;
               done
               
               # 4. OVERWRITE THE DRIVER LIST
@@ -47,7 +52,8 @@ jobs:
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # 6. GLUE FILE (Satisfying MAME, Libretro, and Vector symbols)
+              # 6. COMPREHENSIVE GLUE FILE
+              # Added spriteram_2_size and Vector intensity stubs
               echo '
               #include <stdio.h>
               #include <stddef.h>
@@ -55,21 +61,20 @@ jobs:
 
               // MAME Core Symbols
               size_t spriteram_size = 0;
+              size_t spriteram_2_size = 0;
               unsigned char *spriteram = NULL;
               unsigned char *buffered_spriteram = NULL;
               unsigned char *spriteram_2 = NULL;
               unsigned char *buffered_spriteram_2 = NULL;
 
-              // Cinematronics / Vector Symbols
+              // Vector Stubs
               unsigned char *CinemaVectorData = NULL;
+              float vector_get_intensity(void) { return 1.0f; }
+              void vector_set_intensity(float i) { }
 
               // Libretro Path Stubs
-              void path_basedir(char *path) { 
-                  if (path) path[0] = 0; 
-              }
-              bool path_mkdir(const char *dir) { 
-                  return true; 
-              }
+              void path_basedir(char *path) { if (path) path[0] = 0; }
+              bool path_mkdir(const char *dir) { return true; }
 
               extern int run_game(int game_index); 
               int main(int argc, char *argv[]) {
