@@ -23,7 +23,7 @@ jobs:
             -w /src \
             ps2dev/ps2dev:latest \
             sh -c "
-              # 1. SETUP
+              # 1. TOOLCHAIN SETUP
               apk add --no-cache build-base git && \
               git config --global --add safe.directory /src && \
               export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;) && \
@@ -34,8 +34,9 @@ jobs:
               export PS2SDK=\$PS2DEV/ps2sdk && \
               export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin && \
               
-              # 2. OVERRIDE LIBCO
+              # 2. LIBCO OVERRIDE
               SJLJ_PATH='src/libretro/libretro-common/libco/sjlj.c'
+              mkdir -p \$(dirname \$SJLJ_PATH)
               cat <<EOF > \$SJLJ_PATH
               #include <setjmp.h>
               #include <stdlib.h>
@@ -47,8 +48,7 @@ jobs:
                  return (cothread_t)co_running;
               }
               cothread_t co_create(unsigned int size, void (*entrypoint)(void)) {
-                 sjlj_thread_t *thread = (sjlj_thread_t*)malloc(sizeof(sjlj_thread_t));
-                 return (cothread_t)thread;
+                 return (cothread_t)malloc(sizeof(sjlj_thread_t));
               }
               void co_delete(cothread_t cothread) { free(cothread); }
               void co_switch(cothread_t cothread) {
@@ -59,20 +59,29 @@ jobs:
               }
               EOF
 
-              # 3. COMPILE & LOCATE
-              # We remove 'clean' so it only builds what is missing
-              make platform=ps2 -j\$(nproc)
+              # 3. THE FORCE BUILD
+              # We try common MAME libretro makefile locations if the default fails
+              if [ -f Makefile.libretro ]; then
+                make -f Makefile.libretro platform=ps2 -j\$(nproc)
+              elif [ -f src/libretro/Makefile ]; then
+                make -C src/libretro platform=ps2 -j\$(nproc)
+              else
+                make platform=ps2 -j\$(nproc)
+              fi
               
-              # List files to see what was actually created
-              echo '--- Current Directory Listing ---'
-              ls -R | grep -E '\.elf|\.a|\.so'
+              # 4. DIAGNOSTIC: List everything to see where it went
+              echo '--- All Files Created in Build ---'
+              find . -maxdepth 3 -name '*.a' -o -name '*.elf'
+              
+              # Move whatever we found to the root
+              find . -name '*.a' -exec cp {} . \;
+              find . -name '*.elf' -exec cp {} . \;
             "
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mame2000_ps2_build_output
+          name: mame2000_ps2_binaries
           path: |
-            **/*.elf
-            **/*.a
-            **/*.so
+             ./*.elf
+             ./*.a
