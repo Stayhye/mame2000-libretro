@@ -5,25 +5,21 @@ on: [push, pull_request]
 jobs:
   build-ps2:
     runs-on: ubuntu-latest
-    container: ps2dev/ps2dev:latest
+    # We move the container definition down to the step level 
+    # to avoid the "missing git" trap during initial checkout.
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          # This ensures the .git folder is actually present
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install Dependencies
+      - name: Build inside ps2dev container
+        # We run the actual build command INSIDE the container here
         run: |
-          apk add build-base git
-          # Tell git that this directory is safe, even if owned by a different user
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      - name: Compile
-        run: |
-          # Use the environment's processors to speed up build
-          make platform=ps2 -j$(nproc)
+          docker run --rm -v $(pwd):/src -w /src ps2dev/ps2dev:latest \
+          sh -c "apk add build-base git && make platform=ps2 -j$(nproc)"
 
       - name: Upload ELF
         uses: actions/upload-artifact@v4
