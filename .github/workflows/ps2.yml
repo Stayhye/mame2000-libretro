@@ -20,8 +20,11 @@ jobs:
             sh -c "
               set -e
 
-              # 1. TOOLCHAIN ALIASING
-              # This fixes the 'ee-gcc: No such file' error
+              # 1. INSTALL ESSENTIAL BUILD TOOLS
+              # We must explicitly add 'make' here
+              apk add --no-cache build-base git make
+
+              # 2. TOOLCHAIN ALIASING
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
@@ -30,7 +33,7 @@ jobs:
               ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf /usr/local/ps2dev/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 2. GHOSTING DRIVERS (Maintaining the 5.84MB size)
+              # 3. GHOSTING DRIVERS (Maintaining the 5.84MB size)
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
               for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
                 find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' -exec cp /tmp/ghost.c {} \;
@@ -40,18 +43,18 @@ jobs:
               echo 'extern struct GameDriver driver_avp;' >> src/drivers.c
               echo 'const struct GameDriver *drivers[] = { &driver_avp, 0 };' >> src/drivers.c
 
-              # 3. FIX LIBCO
+              # 4. FIX LIBCO
               CO_DIR='src/libretro/libretro-common/libco'
               mkdir -p \$CO_DIR
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # 4. COMPILE CORE
-              # We pass CC and AR directly to ensure the Makefile uses our aliases
+              # 5. COMPILE CORE
+              # Using the aliases we created above
               make platform=ps2 clean
               make platform=ps2 CC=ee-gcc AR=ee-ar -j\$(nproc)
 
-              # 5. FINAL LINK
+              # 6. FINAL LINK
               echo '--- LINKING AVP.ELF ---'
               CRT0_OBJ=\$PS2SDK/ee/startup/crt0.o
               LINKFILE=\$PS2SDK/ee/startup/linkfile
@@ -62,6 +65,7 @@ jobs:
                 mame2000_libretro_ps2.a \
                 -lpatches -ldebug -lstdc++ -lc -lm -lkernel
               
+              echo '--- DONE ---'
               ls -lh AVP.ELF
             "
 
