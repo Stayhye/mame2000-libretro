@@ -27,7 +27,7 @@ jobs:
               apk add --no-cache build-base git && \
               git config --global --add safe.directory /src && \
               
-              # Find toolchain and create legacy symlinks for the Makefile
+              # Find toolchain and create legacy symlinks
               export EE_BIN_PATH=\$(find /usr/local/ps2dev/ee -name 'mips64r5900el-ps2-elf-gcc' -exec dirname {} \;) && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc && \
               ln -sf \$EE_BIN_PATH/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++ && \
@@ -37,20 +37,23 @@ jobs:
               export PS2SDK=\$PS2DEV/ps2sdk && \
               export PATH=/usr/local/bin:\$PATH:\$PS2DEV/bin:\$PS2SDK/bin && \
               
-              # 2. THE SURGICAL STRIKES (Fixing libco/SJLJ for PS2)
-              # Force C89/Standard C mode and strip POSIX signal usage
-              # We use multiple layers of protection to ensure no sigaction/stack_t is left
+              # 2. THE TOTAL REPLACEMENT (No more line-by-line errors)
               SJLJ_PATH='src/libretro/libretro-common/libco/sjlj.c' && \
-              sed -i '1i #define _LIBCO_C' \$SJLJ_PATH && \
-              sed -i 's/#include <signal.h>/\/\/#include <signal.h>/g' \$SJLJ_PATH && \
+              
+              # Replace signal jumps with standard C jumps globally
               sed -i 's/sigjmp_buf/jmp_buf/g' \$SJLJ_PATH && \
               sed -i 's/sigsetjmp(\([^,]*\), [01])/setjmp(\1)/g' \$SJLJ_PATH && \
               sed -i 's/siglongjmp/longjmp/g' \$SJLJ_PATH && \
               
-              # Logic-based removal of POSIX types that break PS2 compilation
-              for term in stack_t sigaction sigaltstack sigemptyset SA_ONSTACK SIGUSR1 raise; do \
-                sed -i \"/\$term/s/^/\/\//\" \$SJLJ_PATH; \
-              done && \
+              # Nuke the entire signal-stack logic block and replace with a simple malloc
+              # This covers from the 'stack_t' declaration down to the 'sigaction' call
+              # We use a simplified C-style allocation that the PS2 actually supports
+              printf \"#define _LIBCO_C\n#include <setjmp.h>\n#include <stdlib.h>\n\" > temp_sjlj.c && \
+              cat \$SJLJ_PATH >> temp_sjlj.c && mv temp_sjlj.c \$SJLJ_PATH && \
+              
+              # This sed finds the block starting with stack_t and ends it before the return
+              # It replaces the broken POSIX code with a simple PS2-friendly stack pointer
+              sed -i '/stack_t stack;/,/if(!raise(SIGUSR1))/c\      thread->stack = malloc(size);' \$SJLJ_PATH && \
 
               # 3. COMPILATION
               make platform=ps2 clean && \
