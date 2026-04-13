@@ -31,6 +31,14 @@ jobs:
           #ifndef FIX_CPS2_H
           #define FIX_CPS2_H
           
+          #include <stdio.h>
+          #include <stdlib.h>
+
+          /* MAME Types often used in function signatures */
+          typedef unsigned char data8_t;
+          typedef unsigned short data16_t;
+          typedef unsigned int data32_t;
+
           /* Define dummy structs to satisfy type checking */
           struct GfxDecodeInfo { int dummy; };
           struct MemoryReadAddress { int dummy; };
@@ -47,6 +55,10 @@ jobs:
           #define VIDEO_TYPE_RASTER 1
           #define VIDEO_MODIFIES_PALETTE 2
           
+          /* Missing Function Prototypes */
+          void qsound_sharedram_w(int offset, int data);
+          void cps2_qsound_sharedram_w(int offset, int data);
+          
           /* Externs with types that match the MachineDriver structure */
           extern struct MemoryReadAddress cps1_readmem[], qsound_readmem[];
           extern struct MemoryWriteAddress cps1_writemem[], qsound_writemem[];
@@ -61,6 +73,7 @@ jobs:
           #endif
           EOF_FIX
 
+              # Inject our header at the very top
               sed -i "1i #include \"fix_cps2.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > Makefile.ps2
