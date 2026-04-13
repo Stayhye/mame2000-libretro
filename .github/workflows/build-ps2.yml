@@ -26,16 +26,24 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # PHYSICALLY INJECT HEADERS
-              # Removed the "vidhrdw/" prefix so the compiler uses the include paths to find it
+              # AUTO-DETECT HEADER PATHS
+              # Find where driver.h and capcom.h actually live and save the directories
+              DRIVER_DIR=$(find /src -name "driver.h" -exec dirname {} \; | head -n 1)
+              CAPCOM_DIR=$(find /src -name "capcom.h" -exec dirname {} \; | head -n 1)
+              
+              echo "Found driver.h in: $DRIVER_DIR"
+              echo "Found capcom.h in: $CAPCOM_DIR"
+
+              # Inject headers into cps2.c
               sed -i "1i #include <stdio.h>\n#include <stdlib.h>\n#include \"driver.h\"\n#include \"capcom.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > /src/Makefile.ps2
           EE_BIN = AVP.ELF
           EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/sndhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
 
-          # Absolute paths to all possible header locations
-          EE_INCS += -I/src/src -I/src/src/includes -I/src/src/ps2 -I/src/src/libretro \
+          # Dynamically add the discovered paths plus standard ones
+          EE_INCS += -I'"$DRIVER_DIR"' -I'"$CAPCOM_DIR"' \
+                     -I/src/src -I/src/src/includes -I/src/src/ps2 -I/src/src/libretro \
                      -I/src/src/libretro/libretro-common/include \
                      -I/src/src/sndhrdw -I/src/src/vidhrdw -I/src/src/cpu/m68000 \
                      -I/src/src/cpu/z80 -I/src/src/sound
