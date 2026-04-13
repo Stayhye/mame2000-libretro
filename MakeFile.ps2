@@ -2,15 +2,19 @@
 EE_BIN = AVP.ELF
 
 # Core objects and specific Capcom drivers
+# Add src/sndhrdw/capcom.o to your object list
 EE_OBJS = ps2_main.o \
           src/driver.o \
           src/drivers/cps2.o \
           src/drivers/capcom.o \
           src/vidhrdw/capcom.o \
+          src/sndhrdw/capcom.o \
           src/libretro/libretro-common/libco/libco.o
 
 # Search paths
-EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
+# Ensure sndhrdw is in the include path
+EE_INCS += -Isrc/sndhrdw -Isrc/vidhrdw
+		   -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
            -Isrc/libretro/libretro-common/include
 
 # Compiler Flags
