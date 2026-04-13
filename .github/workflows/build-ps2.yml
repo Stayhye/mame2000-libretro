@@ -63,19 +63,18 @@ jobs:
 
               # 6. BUILD ENGINE
               make platform=ps2 clean
-              # Add -Wno-error to let the engine build despite old code quirks
-              make platform=ps2 CC='ee-gcc -fno-lto -Wno-implicit-int' AR=ee-ar -j\$(nproc)
+              # Use flags to ignore the implicit-int errors during the main build
+              make platform=ps2 CC='ee-gcc -fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration' AR=ee-ar -j\$(nproc)
               
-              # 7. MANUAL HARDWARE COMPILE (The Fix for cps2_qsound)
-              # We inject return types for the MAME handlers to satisfy the modern compiler
-              echo \"#define WRITE_HANDLER(name) void name(int offset, int data)\" > fix_handlers.h
-              echo \"#define READ_HANDLER(name) int name(int offset)\" >> fix_handlers.h
+              # 7. MANUAL HARDWARE COMPILE
+              # Instead of a fix file, we use flags to tolerate the old code
+              # And we force-include driver.h so MachineDriver is known
+              INC=\"-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include\"
+              FLAGS=\"-fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=implicit-int -DCPS2\"
               
-              INC=\"-I. -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include\"
-              # -include fix_handlers.h forces the fix into the start of the .c file
-              ee-gcc -fno-lto -c ps2_main.c -o ps2_main.o \$INC
-              ee-gcc -fno-lto -include fix_handlers.h -c \"\$CPS2_C\" -o cps2_manual.o \$INC -DCPS2 -Wno-implicit-int
-              ee-gcc -fno-lto -include fix_handlers.h -c \"\$CAPCOM_C\" -o capcom_manual.o \$INC -DCPS2 -Wno-implicit-int
+              ee-gcc \$FLAGS -c ps2_main.c -o ps2_main.o \$INC
+              ee-gcc \$FLAGS -include src/driver.h -c \"\$CPS2_C\" -o cps2_manual.o \$INC
+              ee-gcc \$FLAGS -include src/driver.h -c \"\$CAPCOM_C\" -o capcom_manual.o \$INC
 
               # 8. FINAL LINK
               CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
