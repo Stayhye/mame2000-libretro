@@ -26,9 +26,7 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # 1. CREATE A BRIDGE HEADER
-              # Instead of dummy macros, we include the actual MAME core headers
-              # and provide only the absolute bare minimum overrides.
+              # 1. UPDATED BRIDGE HEADER
               cat << "EOF_FIX" > bridge.h
           #ifndef BRIDGE_H
           #define BRIDGE_H
@@ -36,22 +34,31 @@ jobs:
           #include <stdlib.h>
           #include <string.h>
 
-          /* Force the compiler to see the real MAME definitions */
           #include "osdepend.h"
           #include "mame.h"
           #include "common.h"
           #include "driver.h"
           #include "drawgfx.h"
 
-          /* PS2 specific overrides for old MAME */
+          /* Force declaration of QSound interface if headers hide it */
+          struct QSound_interface {
+              int clock;
+              int mixing_level;
+              void *region;
+          };
+          extern struct QSound_interface qsound_interface;
+
+          /* Other common CPS2 externs that might be hidden by guards */
+          extern int cps1_qsound_interrupt(void);
+          extern int cps2_vh_start(void);
+          extern void cps2_vh_stop(void);
+          extern void cps2_vh_screenrefresh(void* bitmap, int full_refresh);
+
           #define DECL_SPEC
-          #define CLOCKS_PER_SEC 100
-          
           #endif
           EOF_FIX
 
               # 2. INJECT INTO CPS2.C
-              # We use a cleaner injection that puts the bridge at the top
               sed -i "1i #include \"bridge.h\"" src/drivers/cps2.c
 
               # 3. CONFIGURE THE MAKEFILE
@@ -61,14 +68,13 @@ jobs:
                     src/vidhrdw/capcom.o src/sndhrdw/capcom.o \
                     src/libretro/libretro-common/libco/libco.o
 
-          # Include every directory that contains MAME headers
           EE_INCS += -I. -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
                      -Isrc/libretro/libretro-common/include \
                      -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 \
                      -Isrc/cpu/z80 -Isrc/sound -Isrc/drivers
           
-          # Legacy MAME flags to enable core features
-          EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -D__linux__ \
+          # Added -DHAS_QSOUND to try and trigger the original header definitions
+          EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -D__linux__ -DHAS_QSOUND=1 \
                        -fpermissive -fno-strict-aliasing -fno-common \
                        -Wno-implicit-function-declaration -Wno-implicit-int \
                        -Wno-unused-variable -Wno-return-type
@@ -78,15 +84,12 @@ jobs:
           include $(PS2SDK)/samples/Makefile.pref
           include $(PS2SDK)/samples/Makefile.eeglobal
 
-          # Special rule for libco
           src/libretro/libretro-common/libco/libco.o: src/libretro/libretro-common/libco/libco.c
           	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
           EOF_MAKE
 
-          # 4. STUBS
           printf "#include <stdio.h>\nint main() { return 0; }\n" > ps2_main.c
 
           echo "--- STARTING BUILD ---"
-          # Use -j1 to ensure the log stops exactly where the error is
           make -f Makefile.ps2 -j1
             '
