@@ -11,24 +11,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Prep Source and Discovery
-        id: prep
+      - name: Prep Source
         run: |
-          # 1. Find the files on the runner host
-          CPS2_PATH=$(find src -name 'cps2.c' | head -n 1)
-          CAPCOM_PATH=$(find src -name 'capcom.c' | head -n 1)
-          
-          echo "CPS2_SOURCE=$CPS2_PATH" >> $GITHUB_ENV
-          echo "CAPCOM_SOURCE=$CAPCOM_PATH" >> $GITHUB_ENV
-          echo "CAPCOM_DIR=$(dirname "$CAPCOM_PATH")" >> $GITHUB_ENV
-
-          # 2. Selective Ghosting (Runner side)
+          # Ghosting on the runner side for speed and reliability
           echo 'void ghost_stub(void) {}' > ghost.c
           for d in $(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
             find "$d" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' ! -name 'common.c' -exec cp ghost.c {} \;
           done
-
-          # 3. Setup Driver list
           printf '#include "driver.h"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
 
       - name: Compile and Link ELF
@@ -40,43 +29,32 @@ jobs:
             sh -c "
               set -e
 
-              # Environment Setup
+              # 1. TOOLCHAIN SETUP
               apk add --no-cache build-base git make
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
               
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-gcc /usr/local/bin/ee-gcc
-              ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # Fix libco
+              # 2. CAPTURE SYSTEM FILES (Hardcoded copy to prevent empty variables)
+              cp \$(find \$PS2DEV -name 'crt0.o' | head -n 1) ./crt0_static.o
+              cp \$(find \$PS2DEV -name 'linkfile' | head -n 1) ./linkfile_static
+              
+              # 3. LIBCO & GLUE
               CO_DIR='src/libretro/libretro-common/libco'
               mkdir -p \$CO_DIR
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # Glue Code
-              echo '#include <stdio.h>
-              #include <stddef.h>
-              #include <stdbool.h>
-              size_t spriteram_size = 0, spriteram_2_size = 0;
-              unsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;
-              float vector_get_intensity(void) { return 1.0f; }
-              void vector_set_intensity(float i) { }
-              void path_basedir(char *p) { if(p) p[0] = 0; }
-              bool path_mkdir(const char *d) { return true; }
-              extern int run_game(int i); 
-              int main(int c, char **v) { return run_game(0); }' > ps2_main.c
+              echo '#include <stdio.h>\n#include <stddef.h>\n#include <stdbool.h>\nsize_t spriteram_size = 0, spriteram_2_size = 0;\nunsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;\nfloat vector_get_intensity(void) { return 1.0f; }\nvoid vector_set_intensity(float i) { }\nvoid path_basedir(char *p) { if(p) p[0] = 0; }\nbool path_mkdir(const char *d) { return true; }\nextern int run_game(int i); \nint main(int c, char **v) { return run_game(0); }' > ps2_main.c
 
-              # Build
+              # 4. MAIN BUILD
               make platform=ps2 clean
               make platform=ps2 CC='ee-gcc -fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration' AR=ee-ar -j\$(nproc)
               
-              # Manual Compile using the variables passed from the host
-              # Note: Env variables from the host aren't automatically in Docker, 
-              # so we re-find them one last time inside the container safely.
-              
+              # 5. MANUAL HARDWARE COMPILE
               C_CPS2=\$(find src -name 'cps2.c' | head -n 1)
               C_CAPCOM=\$(find src -name 'capcom.c' | head -n 1)
               D_CAPCOM=\$(dirname \"\$C_CAPCOM\")
@@ -88,13 +66,20 @@ jobs:
               ee-gcc \$FLAGS -c \"\$C_CAPCOM\" -o capcom_manual.o \$INC
               ee-gcc \$FLAGS -c \"\$C_CPS2\" -o cps2_manual.o \$INC
 
-              # Final Link
-              CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
-              LNK=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
+              # 6. FINAL LINK (No Variables in the file list)
+              echo '--- LINKING AVP.ELF ---'
+              ee-gcc -fno-lto -T ./linkfile_static \
+                -L \"\$PS2SDK/ee/lib\" \
+                -o AVP.ELF \
+                ./crt0_static.o \
+                ps2_main.o \
+                capcom_manual.o \
+                cps2_manual.o \
+                mame2000_libretro_ps2.a \
+                -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
               
-              ee-gcc -fno-lto -T\"\$LNK\" -L\"\$PS2SDK/ee/lib\" -L\$(dirname \"\$CRT0\") \
-                -o AVP.ELF ps2_main.o capcom_manual.o cps2_manual.o \
-                \"\$CRT0\" mame2000_libretro_ps2.a -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
+              echo '--- SUCCESS ---'
+              ls -lh AVP.ELF
             "
 
       - name: Upload ELF
