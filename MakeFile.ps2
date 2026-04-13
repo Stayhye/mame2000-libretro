@@ -1,8 +1,7 @@
 # MAME 2000 AvP PS2 Makefile
 EE_BIN = AVP.ELF
 
-# Core objects and specific Capcom drivers
-# Add src/sndhrdw/capcom.o to your object list
+# Added src/sndhrdw/capcom.o to resolve QSound symbols
 EE_OBJS = ps2_main.o \
           src/driver.o \
           src/drivers/cps2.o \
@@ -11,24 +10,21 @@ EE_OBJS = ps2_main.o \
           src/sndhrdw/capcom.o \
           src/libretro/libretro-common/libco/libco.o
 
-# Search paths
-# Ensure sndhrdw is in the include path
-EE_INCS += -Isrc/sndhrdw -Isrc/vidhrdw
-		   -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
-           -Isrc/libretro/libretro-common/include
+# Added sndhrdw and vidhrdw to the include paths
+EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
+           -Isrc/libretro/libretro-common/include \
+           -Isrc/sndhrdw -Isrc/vidhrdw
 
 # Compiler Flags
-# -D_PS2 and -DCPS2 are critical for the headers to select the right code paths
 EE_CFLAGS += -D_PS2 -DCPS2 -DDECL_SPEC= -Wno-implicit-int \
              -Wno-error=implicit-int -Wno-error=implicit-function-declaration
 
-# Linker Libraries
 EE_LIBS = -lpatches -ldebug -lstdc++ -lm -lc -lkernel
 
-# Include the PS2 SDK global rules
-include $(PS2SDK)/samples/Makefile.pref
-include $(PS2SDK)/samples/Makefile.eeglobal
+# PS2 SDK standard includes
+include /usr/local/ps2dev/ps2sdk/samples/Makefile.pref
+include /usr/local/ps2dev/ps2sdk/samples/Makefile.eeglobal
 
-# Custom rule for libco as it needs SJLJ
+# Custom rule for libco (requires specific handling in MAME 2000)
 src/libretro/libretro-common/libco/libco.o: src/libretro/libretro-common/libco/libco.c
 	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
