@@ -30,14 +30,17 @@ jobs:
           EE_BIN = AVP.ELF
           EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/sndhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
 
+          # Added src/cpu and src/sound to ensure all core headers are reachable
           EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include \
-                     -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 -Isrc/cpu/z80
+                     -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 -Isrc/cpu/z80 -Isrc/sound
           
-          # -fpermissive allows the build to bypass "non-void function" errors
+          # FORCE INCLUDE: We force the compiler to load driver.h and stdio.h
+          # This fixes the "incomplete type" and "undeclared" errors in cps2.c
           EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -DDECL_SPEC= \
+                       -include stdio.h -include src/driver.h \
                        -fpermissive -fno-strict-aliasing \
-                       -Wno-implicit-int -Wno-unused-variable \
-                       -Wno-return-type -Wno-error=implicit-function-declaration
+                       -Wno-implicit-int -Wno-unused-variable -Wno-return-type \
+                       -Wno-error=implicit-function-declaration
           
           EE_LIBS = -lpatches -ldebug -lstdc++ -lm -lc -lkernel
 
@@ -57,9 +60,6 @@ jobs:
 
           echo "--- STARTING BUILD ---"
           make -f /src/Makefile.ps2 -j$(nproc)
-
-          echo "--- SUCCESS ---"
-          ls -lh /src/AVP.ELF
             '
 
       - name: Upload ELF
