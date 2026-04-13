@@ -26,14 +26,15 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # PHYSICALLY INJECT HEADERS into the top of cps2.c
-              # This provides the missing definitions for MachineDriver, PORT_START, etc.
-              sed -i "1i #include <stdio.h>\n#include <stdlib.h>\n#include \"driver.h\"\n#include \"vidhrdw/capcom.h\"" src/drivers/cps2.c
+              # PHYSICALLY INJECT HEADERS
+              # Removed the "vidhrdw/" prefix so the compiler uses the include paths to find it
+              sed -i "1i #include <stdio.h>\n#include <stdlib.h>\n#include \"driver.h\"\n#include \"capcom.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > /src/Makefile.ps2
           EE_BIN = AVP.ELF
           EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/sndhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
 
+          # Absolute paths to all possible header locations
           EE_INCS += -I/src/src -I/src/src/includes -I/src/src/ps2 -I/src/src/libretro \
                      -I/src/src/libretro/libretro-common/include \
                      -I/src/src/sndhrdw -I/src/src/vidhrdw -I/src/src/cpu/m68000 \
