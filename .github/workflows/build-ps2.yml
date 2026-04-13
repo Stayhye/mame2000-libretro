@@ -19,48 +19,46 @@ jobs:
             ps2dev/ps2dev:latest \
             sh -c "
               set -e
-
-              # 1. INSTALL BUILD TOOLS
+              
+              # 1. INSTALL TOOLS
+              echo '--- Installing Dependencies ---'
               apk add --no-cache build-base git make
               
+              # 2. EXPORT PATHS
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
               export PATH=\$PATH:\$PS2DEV/bin:\$PS2DEV/ee/bin:\$PS2SDK/bin
 
-              # 2. GENERATE MAKEFILE.PS2 ON THE FLY
-              # This ensures the file exists regardless of repo state
+              # 3. GENERATE THE MAKEFILE
+              # Writing this here ensures Docker always sees it
               cat << 'EOF' > Makefile.ps2
               EE_BIN = AVP.ELF
-              EE_OBJS = ps2_main.o \
-                        src/driver.o \
-                        src/drivers/cps2.o \
-                        src/drivers/capcom.o \
-                        src/vidhrdw/capcom.o \
-                        src/libretro/libretro-common/libco/libco.o
-
-              EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
-                         -Isrc/libretro/libretro-common/include
+              EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
               
-              # Pull the Capcom dir path for additional headers
+              EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include
+              
+              # Auto-resolve Capcom header directory
               CAPCOM_DIR = \$(shell find src -name 'capcom.c' -exec dirname {} \;)
               EE_INCS += -I\$(CAPCOM_DIR)
 
-              EE_CFLAGS += -D_PS2 -DCPS2 -DDECL_SPEC= -Wno-implicit-int \
-                           -Wno-error=implicit-int -Wno-error=implicit-function-declaration
-
+              EE_CFLAGS += -D_PS2 -DCPS2 -DDECL_SPEC= -Wno-implicit-int -Wno-error=implicit-int -Wno-error=implicit-function-declaration
               EE_LIBS = -lpatches -ldebug -lstdc++ -lm -lc -lkernel
 
               include \$(PS2SDK)/samples/Makefile.pref
               include \$(PS2SDK)/samples/Makefile.eeglobal
 
-              # Custom rule for libco
+              # Rule for libco
               src/libretro/libretro-common/libco/libco.o: src/libretro/libretro-common/libco/libco.c
               	\$(EE_CC) \$(EE_CFLAGS) \$(EE_INCS) -c \$< -o \$@
               EOF
 
-              # 3. GENERATE C DEPENDENCIES
-              # Create the driver list
+              # 4. PREP SOURCE FILES
+              echo '--- Generating Source stubs ---'
+              # Create driver list
               printf '#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
+
+              # Create PS2 Glue (Fixing the exit and main entry points)
+              echo '#include <stdio.h>\n#include <stddef.h>\n#include <stdbool.h>\nsize_t spriteram_size = 0, spriteram_2_size = 0;\nunsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;\nfloat vector_get_intensity(void) { return 1.0f; }\nvoid vector_set_intensity(float i) { }\nvoid path_basedir(char *p) { if(p) p[0] = 0; }\nbool path_mkdir(const char *d) { return true; }\nextern int run_game(int i); \nint main(int c, char **v) { return run_game(0); }' > ps2_main.c
 
               # Create libco bridge
               CO_DIR='src/libretro/libretro-common/libco'
@@ -68,14 +66,12 @@ jobs:
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # Create PS2 Main Glue
-              echo '#include <stdio.h>\n#include <stddef.h>\n#include <stdbool.h>\nsize_t spriteram_size = 0, spriteram_2_size = 0;\nunsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;\nfloat vector_get_intensity(void) { return 1.0f; }\nvoid vector_set_intensity(float i) { }\nvoid path_basedir(char *p) { if(p) p[0] = 0; }\nbool path_mkdir(const char *d) { return true; }\nextern int run_game(int i); \nint main(int c, char **v) { return run_game(0); }' > ps2_main.c
-
-              # 4. EXECUTE BUILD
+              # 5. EXECUTE BUILD
+              echo '--- Starting Compilation ---'
               make -f Makefile.ps2 clean
               make -f Makefile.ps2 -j\$(nproc)
 
-              echo '--- SUCCESS ---'
+              echo '--- Build Success ---'
               ls -lh AVP.ELF
             "
 
