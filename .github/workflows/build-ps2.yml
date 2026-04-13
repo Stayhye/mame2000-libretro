@@ -26,8 +26,7 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # PHYSICALLY INJECT REFINED DEFINITIONS
-              # We removed the function prototypes to avoid redeclaration errors
+              # REFINED DEFINITIONS
               cat << "EOF_FIX" > fix_cps2.h
           #ifndef FIX_CPS2_H
           #define FIX_CPS2_H
@@ -58,16 +57,23 @@ jobs:
           #define VIDEO_TYPE_RASTER 1
           #define VIDEO_MODIFIES_PALETTE 2
           
-          /* Externs only - No function prototypes to avoid conflicts */
+          /* Externs for Structure Initialization */
+          /* These MUST be declared because they are used as pointers in machine_driver_cps2 */
           extern struct MemoryReadAddress cps1_readmem[], qsound_readmem[];
           extern struct MemoryWriteAddress cps1_writemem[], qsound_writemem[];
           extern struct GfxDecodeInfo cps1_gfxdecodeinfo[];
           extern struct QSound_interface qsound_interface;
           
+          /* Function Pointers for the Driver Struct */
+          int cps1_qsound_interrupt(void);
+          int cps2_vh_start(void);
+          void cps2_vh_stop(void);
+          void cps2_vh_screenrefresh(void* bitmap, int full_refresh);
+          
           #endif
           EOF_FIX
 
-              # Inject our header at the very top
+              # Re-inject the header
               sed -i "1i #include \"fix_cps2.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > Makefile.ps2
@@ -79,7 +85,6 @@ jobs:
                      -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 \
                      -Isrc/cpu/z80 -Isrc/sound -Isrc/drivers
           
-          # Removed -Werror=implicit-function-declaration to let it pass
           EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -D__linux__ -DDECL_SPEC= \
                        -fpermissive -fno-strict-aliasing -fno-common \
                        -Wno-implicit-function-declaration -Wno-implicit-int \
