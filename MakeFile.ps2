@@ -1,0 +1,16 @@
+# Basic PS2 Hardware Build
+EE_BIN = AVP.ELF
+EE_OBJS = ps2_main.o src/drivers/cps2.o src/vidhrdw/capcom.o src/drivers/capcom.o
+
+# Toolchain paths
+include $(PS2SDK)/samples/Makefile.pref
+include $(PS2SDK)/samples/Makefile.eeglobal
+
+# MAME Specific Flags
+EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include
+EE_CFLAGS += -D_PS2 -DCPS2 -Wno-implicit-int -Wno-error=implicit-int
+
+all: $(EE_BIN)
+
+clean:
+	rm -f $(EE_OBJS) $(EE_BIN)
