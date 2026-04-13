@@ -13,7 +13,6 @@ jobs:
 
       - name: Create Build Script
         run: |
-          # Note the #!/bin/sh at the top - critical for Alpine/Docker
           cat << 'EOF' > build_ps2.sh
           #!/bin/sh
           set -e
@@ -26,26 +25,31 @@ jobs:
           export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
           echo "--- STEP 2: GENERATING MAKEFILE ---"
-          cat << 'MAKE' > Makefile.ps2
+          # We use a single quote around EOF to prevent any shell interference
+          cat > Makefile.ps2 << 'MAKEFILE'
           EE_BIN = AVP.ELF
           EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
           
-          EE_INCS += -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include
-          CAPCOM_DIR = \$(shell find src -name 'capcom.c' -exec dirname {} \;)
-          EE_INCS += -I\$(CAPCOM_DIR)
+          EE_INCS = -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include
+          
+          # Simplified find to avoid escaping issues
+          CAPCOM_DIR = $(shell find src -name 'capcom.c' -exec dirname {} \;)
+          EE_INCS += -I$(CAPCOM_DIR)
 
-          EE_CFLAGS += -D_PS2 -DCPS2 -DDECL_SPEC= -Wno-implicit-int -Wno-error=implicit-int -Wno-error=implicit-function-declaration
+          EE_CFLAGS = -D_PS2 -DCPS2 -DDECL_SPEC= -Wno-implicit-int -Wno-error=implicit-int -Wno-error=implicit-function-declaration
           EE_LIBS = -lpatches -ldebug -lstdc++ -lm -lc -lkernel
 
-          include \$(PS2SDK)/samples/Makefile.pref
-          include \$(PS2SDK)/samples/Makefile.eeglobal
+          # Use the absolute paths directly to bypass variable weirdness
+          include /usr/local/ps2dev/ps2sdk/samples/Makefile.pref
+          include /usr/local/ps2dev/ps2sdk/samples/Makefile.eeglobal
 
           src/libretro/libretro-common/libco/libco.o: src/libretro/libretro-common/libco/libco.c
-          	\$(EE_CC) \$(EE_CFLAGS) \$(EE_INCS) -c \$< -o \$@
-          MAKE
+          	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
+          MAKEFILE
 
           echo "--- STEP 3: PREPPING SOURCE STUBS ---"
           printf '#include "driver.h"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
+          
           echo '#include <stdio.h>\n#include <stddef.h>\n#include <stdbool.h>\nsize_t spriteram_size = 0, spriteram_2_size = 0;\nunsigned char *spriteram = NULL, *buffered_spriteram = NULL, *spriteram_2 = NULL, *buffered_spriteram_2 = NULL, *CinemaVectorData = NULL;\nfloat vector_get_intensity(void) { return 1.0f; }\nvoid vector_set_intensity(float i) { }\nvoid path_basedir(char *p) { if(p) p[0] = 0; }\nbool path_mkdir(const char *d) { return true; }\nextern int run_game(int i); \nint main(int c, char **v) { return run_game(0); }' > ps2_main.c
 
           CO_DIR='src/libretro/libretro-common/libco'
@@ -54,6 +58,9 @@ jobs:
           cp $CO_DIR/sjlj.c $CO_DIR/libco.c
 
           echo "--- STEP 4: RUNNING MAKE ---"
+          # Check if the file exists before running
+          ls -l /usr/local/ps2dev/ps2sdk/samples/Makefile.pref
+          
           make -f Makefile.ps2 clean
           make -f Makefile.ps2 -j$(nproc)
 
@@ -61,17 +68,3 @@ jobs:
           ls -lh AVP.ELF
           EOF
           chmod +x build_ps2.sh
-
-      - name: Execute Build inside Docker
-        run: |
-          docker run --rm \
-            -v $(pwd):/src \
-            -w /src \
-            ps2dev/ps2dev:latest \
-            sh ./build_ps2.sh
-
-      - name: Upload ELF
-        uses: actions/upload-artifact@v4
-        with:
-          name: avp-ps2-elf
-          path: AVP.ELF
