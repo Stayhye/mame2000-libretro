@@ -26,22 +26,23 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # CREATE THE DEFINITIVE MAME 2000 STRUCTURE FIX
+              # CREATE THE FULL MAME COMPATIBILITY LAYER
               cat << "EOF_FIX" > fix_cps2.h
           #ifndef FIX_CPS2_H
           #define FIX_CPS2_H
 
-          /* 1. Fundamental MAME 2000 Types */
           typedef unsigned char data8_t;
           typedef unsigned short data16_t;
           typedef unsigned int data32_t;
 
-          /* 2. Required Component Structs */
+          /* Structure definitions to fix "Storage Size Unknown" */
           struct MachineCPU { int cpu_type; int cpu_clock; const void *memory_read; const void *memory_write; const void *port_read; const void *port_write; void (*vblank_interrupt)(void); int vblank_interrupts_per_frame; };
           struct GfxDecodeInfo { int dummy; };
           struct QSound_interface { int dummy; };
+          struct RomModule { unsigned int _name; unsigned int _offset; unsigned int _length; unsigned int _flags; };
+          struct InputPortTiny { int dummy; };
+          struct GameDriver { const char *year; const char *source_file; const char *name; const char *description; const void *rom; const void *parent; const void *drv; const void *input; void (*init)(void); const void *monitor; int flags; };
 
-          /* 3. THE MACHINE DRIVER DEFINITION (The Fix for Error 1) */
           struct MachineDriver {
               struct MachineCPU cpu[8];
               int frames_per_second;
@@ -62,7 +63,18 @@ jobs:
               struct { int sound_type; void *sound_interface; } sound[5];
           };
 
-          /* 4. Macros for CPS2 Data */
+          /* Macros to prevent "Expected { at end of input" */
+          #define ROM_START(name) static const struct RomModule rom_##name[] = {
+          #define ROM_END { 0, 0, 0, 0 } };
+          #define PORT_START(name) static const struct InputPortTiny input_ports_##name[] = {
+          #define PORT_END { 0 } };
+          #define ROM_LOAD(name,offs,len,crc) { 0, offs, len, 0 },
+          
+          /* Game Driver Macros */
+          #define GAMEX(year,name,parent,drv,input,init,monitor,flags,desc) \
+          extern const struct GameDriver driver_##parent; \
+          const struct GameDriver driver_##name = { #year, __FILE__, #name, desc, rom_##name, &driver_##parent, &machine_driver_##drv, input_ports_##input, init, monitor, flags };
+
           #define CPU_M68000 1
           #define CPU_Z80 2
           #define CPU_AUDIO_CPU 0x8000
@@ -70,7 +82,7 @@ jobs:
           #define VIDEO_TYPE_RASTER 1
           #define VIDEO_MODIFIES_PALETTE 2
 
-          /* 5. Externs for linker symbols */
+          /* Externs */
           extern const void *cps1_readmem, *cps1_writemem, *qsound_readmem, *qsound_writemem;
           extern struct GfxDecodeInfo cps1_gfxdecodeinfo[];
           extern struct QSound_interface qsound_interface;
@@ -80,7 +92,7 @@ jobs:
           #endif
           EOF_FIX
 
-              # Inject the header
+              # Re-inject and clean the file of potential garbage
               sed -i "1i #include \"fix_cps2.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > Makefile.ps2
