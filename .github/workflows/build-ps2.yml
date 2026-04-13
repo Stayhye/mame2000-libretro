@@ -26,20 +26,20 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # PHYSICALLY INJECT HEADERS
-              # Using the core headers which usually contain the Capcom/CPS2 declarations
-              # We use a conditional check to avoid breaking if capcom.h really doesn't exist
-              sed -i "1i #include <stdio.h>\n#include <stdlib.h>\n#include \"mame.h\"\n#include \"common.h\"\n#include \"driver.h\"" src/drivers/cps2.c
+              # 1. PHYSICALLY INJECT CORE HEADERS into cps2.c
+              # We use a broad set of headers to ensure MachineDriver is found
+              sed -i "1i #include <stdio.h>\n#include <stdlib.h>\n#include \"osdepend.h\"\n#include \"driver.h\"" src/drivers/cps2.c
 
-              cat << "EOF_MAKE" > /src/Makefile.ps2
+              # 2. CREATE THE MAKEFILE (using relative paths for the container)
+              cat << "EOF_MAKE" > Makefile.ps2
           EE_BIN = AVP.ELF
           EE_OBJS = ps2_main.o src/driver.o src/drivers/cps2.o src/drivers/capcom.o src/vidhrdw/capcom.o src/sndhrdw/capcom.o src/libretro/libretro-common/libco/libco.o
 
-          # Broadening the include search to cover every possible MAME source folder
-          EE_INCS += -I/src/src -I/src/src/includes -I/src/src/ps2 -I/src/src/libretro \
-                     -I/src/src/libretro/libretro-common/include \
-                     -I/src/src/sndhrdw -I/src/src/vidhrdw -I/src/src/cpu/m68000 \
-                     -I/src/src/cpu/z80 -I/src/src/sound -I/src/src/drivers
+          # Include every directory that could possibly hold a .h file
+          EE_INCS += -I. -Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro \
+                     -Isrc/libretro/libretro-common/include \
+                     -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 \
+                     -Isrc/cpu/z80 -Isrc/sound -Isrc/drivers
           
           EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -D__linux__ -DDECL_SPEC= \
                        -fpermissive -fno-strict-aliasing -fno-common \
@@ -55,12 +55,20 @@ jobs:
           	$(EE_CC) $(EE_CFLAGS) $(EE_INCS) -c $< -o $@
           EOF_MAKE
 
-          # Stubs
-          printf "#include <stdio.h>\nint main() { return 0; }\n" > /src/ps2_main.c
+          # 3. GENERATE STUBS
+          printf "#include <stdio.h>\nint main() { printf(\"Starting MAME...\\\\n\"); return 0; }\n" > ps2_main.c
           
-          # Create a dummy driver.h if it somehow went missing to at least let the compiler pass the include line
-          if [ ! -f /src/src/driver.h ]; then touch /src/src/driver.h; fi
+          # Create driver.c if it doesnt exist to resolve linker errors later
+          if [ ! -f src/driver.c ]; then
+            printf "#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n" > src/driver.c
+          fi
 
-          echo "--- BUILDING ---"
-          make -f /src/Makefile.ps2 -j1
+          echo "--- STARTING BUILD ---"
+          make -f Makefile.ps2 -j$(nproc)
             '
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: avp-ps2-elf
+          path: AVP.ELF
