@@ -30,11 +30,16 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 2. DISCOVER SOURCE PATHS
+              # 2. RESOLVE PATHS (Robust Version)
               CPS2_C=\$(find src -name 'cps2.c' | head -n 1)
               CAPCOM_C=\$(find src -name 'capcom.c' | head -n 1)
-              # Also find where the Capcom headers live
-              CAPCOM_DIR=\$(dirname \"\$CAPCOM_C\")
+              
+              # Get the absolute directory for Capcom headers
+              CAP_DIR_RAW=\$(dirname \"\$CAPCOM_C\")
+              CAPCOM_DIR=\$(cd \"\$CAP_DIR_RAW\" && pwd)
+              SRC_DIR=\$(pwd)/src
+              
+              echo \"Resolved Capcom Dir: \$CAPCOM_DIR\"
 
               # 3. GHOSTING
               echo 'void ghost_stub(void) {}' > /tmp/ghost.c
@@ -63,14 +68,13 @@ jobs:
               extern int run_game(int i); 
               int main(int c, char **v) { return run_game(0); }' > ps2_main.c
 
-              # 6. BUILD CORE ENGINE
+              # 6. BUILD ENGINE
               make platform=ps2 clean
               make platform=ps2 CC='ee-gcc -fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration' AR=ee-ar -j\$(nproc)
               
               # 7. MANUAL HARDWARE COMPILE
-              # We add the Capcom directory to the include path and define CPS2
-              INC=\"-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include -I\$CAPCOM_DIR\"
-              FLAGS=\"-fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=implicit-int -DCPS2 -DDECL_SPEC= -D_PS2\"
+              INC=\"-I\$SRC_DIR -I\$SRC_DIR/includes -I\$SRC_DIR/ps2 -I\$SRC_DIR/libretro -I\$SRC_DIR/libretro/libretro-common/include -I\$CAPCOM_DIR\"
+              FLAGS=\"-fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=implicit-int -DCPS2 -D_PS2\"
               
               ee-gcc \$FLAGS -c ps2_main.c -o ps2_main.o \$INC
               ee-gcc \$FLAGS -c \"\$CAPCOM_C\" -o capcom_manual.o \$INC
@@ -82,8 +86,8 @@ jobs:
               
               echo '--- LINKING AVP.ELF ---'
               ee-gcc -fno-lto -T\"\$LNK\" -L\"\$PS2SDK/ee/lib\" -L\$(dirname \"\$CRT0\") \
-                -o AVP.ELF \"\$CRT0\" ps2_main.o capcom_manual.o cps2_manual.o \
-                mame2000_libretro_ps2.a -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
+                -o AVP.ELF ps2_main.o capcom_manual.o cps2_manual.o \
+                \"\$CRT0\" mame2000_libretro_ps2.a -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
               
               echo '--- SUCCESS ---'
               ls -lh AVP.ELF
