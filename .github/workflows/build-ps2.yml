@@ -11,6 +11,26 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Prep Source and Discovery
+        id: prep
+        run: |
+          # 1. Find the files on the runner host
+          CPS2_PATH=$(find src -name 'cps2.c' | head -n 1)
+          CAPCOM_PATH=$(find src -name 'capcom.c' | head -n 1)
+          
+          echo "CPS2_SOURCE=$CPS2_PATH" >> $GITHUB_ENV
+          echo "CAPCOM_SOURCE=$CAPCOM_PATH" >> $GITHUB_ENV
+          echo "CAPCOM_DIR=$(dirname "$CAPCOM_PATH")" >> $GITHUB_ENV
+
+          # 2. Selective Ghosting (Runner side)
+          echo 'void ghost_stub(void) {}' > ghost.c
+          for d in $(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
+            find "$d" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' ! -name 'common.c' -exec cp ghost.c {} \;
+          done
+
+          # 3. Setup Driver list
+          printf '#include "driver.h"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
+
       - name: Compile and Link ELF
         run: |
           docker run --rm \
@@ -20,7 +40,7 @@ jobs:
             sh -c "
               set -e
 
-              # 1. SETUP
+              # Environment Setup
               apk add --no-cache build-base git make
               export PS2DEV=/usr/local/ps2dev
               export PS2SDK=\$PS2DEV/ps2sdk
@@ -30,32 +50,13 @@ jobs:
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-g++ /usr/local/bin/ee-g++
               ln -sf \$PS2DEV/ee/bin/mips64r5900el-ps2-elf-ar /usr/local/bin/ee-ar
 
-              # 2. RESOLVE PATHS (Robust Version)
-              CPS2_C=\$(find src -name 'cps2.c' | head -n 1)
-              CAPCOM_C=\$(find src -name 'capcom.c' | head -n 1)
-              
-              # Get the absolute directory for Capcom headers
-              CAP_DIR_RAW=\$(dirname \"\$CAPCOM_C\")
-              CAPCOM_DIR=\$(cd \"\$CAP_DIR_RAW\" && pwd)
-              SRC_DIR=\$(pwd)/src
-              
-              echo \"Resolved Capcom Dir: \$CAPCOM_DIR\"
-
-              # 3. GHOSTING
-              echo 'void ghost_stub(void) {}' > /tmp/ghost.c
-              for d in \$(find src -type d -name 'drivers' -o -name 'vidhrdw' -o -name 'sndhrdw'); do
-                find \"\$d\" -name '*.c' ! -name 'cps2.c' ! -name 'capcom.c' ! -name 'common.c' -exec cp /tmp/ghost.c {} \;
-              done
-              
-              # 4. DRIVER LIST & LIBCO FIX
-              printf '#include \"driver.h\"\nextern struct GameDriver driver_avp;\nconst struct GameDriver *drivers[] = { &driver_avp, 0 };\n' > src/driver.c
-              
+              # Fix libco
               CO_DIR='src/libretro/libretro-common/libco'
               mkdir -p \$CO_DIR
               printf '#include <setjmp.h>\n#include <stdlib.h>\n#include \"libco.h\"\ntypedef struct { jmp_buf context; } sjlj_thread_t;\nstatic sjlj_thread_t *co_running = NULL;\ncothread_t co_active(void) { if(!co_running) { static sjlj_thread_t m; co_running = &m; } return (cothread_t)co_running; }\ncothread_t co_create(unsigned int s, void (*e)(void)) { return (cothread_t)malloc(sizeof(sjlj_thread_t)); }\nvoid co_delete(cothread_t c) { free(c); }\nvoid co_switch(cothread_t n) { sjlj_thread_t *next = (sjlj_thread_t*)n; sjlj_thread_t *prev = co_running; co_running = next; if(!setjmp(prev->context)) longjmp(next->context, 1); }' > \$CO_DIR/sjlj.c
               cp \$CO_DIR/sjlj.c \$CO_DIR/libco.c
 
-              # 5. GLUE CODE
+              # Glue Code
               echo '#include <stdio.h>
               #include <stddef.h>
               #include <stdbool.h>
@@ -68,29 +69,32 @@ jobs:
               extern int run_game(int i); 
               int main(int c, char **v) { return run_game(0); }' > ps2_main.c
 
-              # 6. BUILD ENGINE
+              # Build
               make platform=ps2 clean
               make platform=ps2 CC='ee-gcc -fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration' AR=ee-ar -j\$(nproc)
               
-              # 7. MANUAL HARDWARE COMPILE
-              INC=\"-I\$SRC_DIR -I\$SRC_DIR/includes -I\$SRC_DIR/ps2 -I\$SRC_DIR/libretro -I\$SRC_DIR/libretro/libretro-common/include -I\$CAPCOM_DIR\"
+              # Manual Compile using the variables passed from the host
+              # Note: Env variables from the host aren't automatically in Docker, 
+              # so we re-find them one last time inside the container safely.
+              
+              C_CPS2=\$(find src -name 'cps2.c' | head -n 1)
+              C_CAPCOM=\$(find src -name 'capcom.c' | head -n 1)
+              D_CAPCOM=\$(dirname \"\$C_CAPCOM\")
+              
+              INC=\"-Isrc -Isrc/includes -Isrc/ps2 -Isrc/libretro -Isrc/libretro/libretro-common/include -I\$D_CAPCOM\"
               FLAGS=\"-fno-lto -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=implicit-int -DCPS2 -D_PS2\"
               
               ee-gcc \$FLAGS -c ps2_main.c -o ps2_main.o \$INC
-              ee-gcc \$FLAGS -c \"\$CAPCOM_C\" -o capcom_manual.o \$INC
-              ee-gcc \$FLAGS -c \"\$CPS2_C\" -o cps2_manual.o \$INC
+              ee-gcc \$FLAGS -c \"\$C_CAPCOM\" -o capcom_manual.o \$INC
+              ee-gcc \$FLAGS -c \"\$C_CPS2\" -o cps2_manual.o \$INC
 
-              # 8. FINAL LINK
+              # Final Link
               CRT0=\$(find \$PS2DEV -name 'crt0.o' | head -n 1)
               LNK=\$(find \$PS2DEV -name 'linkfile' | head -n 1)
               
-              echo '--- LINKING AVP.ELF ---'
               ee-gcc -fno-lto -T\"\$LNK\" -L\"\$PS2SDK/ee/lib\" -L\$(dirname \"\$CRT0\") \
                 -o AVP.ELF ps2_main.o capcom_manual.o cps2_manual.o \
                 \"\$CRT0\" mame2000_libretro_ps2.a -lpatches -ldebug -lstdc++ -lc -lm -lkernel -Wl,-z,muldefs
-              
-              echo '--- SUCCESS ---'
-              ls -lh AVP.ELF
             "
 
       - name: Upload ELF
