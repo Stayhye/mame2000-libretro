@@ -26,25 +26,30 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # CREATE A CLEANER FIX_CPS2.H
-              # We only define types and externs for DATA, not FUNCTIONS.
+              # CREATE A COMPREHENSIVE MAME BOILERPLATE
               cat << "EOF_FIX" > fix_cps2.h
           #ifndef FIX_CPS2_H
           #define FIX_CPS2_H
-          
           #include <stdio.h>
           #include <stdlib.h>
 
+          /* Basic Types */
           typedef unsigned char data8_t;
           typedef unsigned short data16_t;
           typedef unsigned int data32_t;
 
+          /* Dummy Structs for MachineDriver */
+          struct InternalMachineDriver { int dummy; };
           struct GfxDecodeInfo { int dummy; };
           struct MemoryReadAddress { int dummy; };
           struct MemoryWriteAddress { int dummy; };
           struct QSound_interface { int dummy; };
-
-          #include "driver.h"
+          
+          /* MAME Core Macros - These are essential if cps2.c is "naked" */
+          #define ROM_START(name) static const struct RomModule rom_##name[] = {
+          #define ROM_END { 0 } };
+          #define PORT_START(name) static const struct InputPortTiny input_ports_##name[] = {
+          #define PORT_END { 0 } };
           
           #define CPU_M68000 1
           #define CPU_Z80 2
@@ -52,18 +57,26 @@ jobs:
           #define SOUND_QSOUND 1
           #define VIDEO_TYPE_RASTER 1
           #define VIDEO_MODIFIES_PALETTE 2
-          
+
+          /* Include the SDK driver.h but hide conflicting parts */
+          #define MachineDriver InternalMachineDriver
+          #include "driver.h"
+          #undef MachineDriver
+
+          /* Externs */
           extern struct MemoryReadAddress cps1_readmem[], qsound_readmem[];
           extern struct MemoryWriteAddress cps1_writemem[], qsound_writemem[];
           extern struct GfxDecodeInfo cps1_gfxdecodeinfo[];
           extern struct QSound_interface qsound_interface;
-          
+          extern int cps1_qsound_interrupt();
+          extern int cps2_vh_start();
+          extern void cps2_vh_stop();
+          extern void cps2_vh_screenrefresh();
           #endif
           EOF_FIX
 
-              # INJECT THE HEADER AND DUMMY PROTOTYPES
-              # We use "extern" without specific types for the functions to avoid conflicts
-              sed -i "1i #include \"fix_cps2.h\"\nextern int cps1_qsound_interrupt();\nextern int cps2_vh_start();\nextern void cps2_vh_stop();\nextern void cps2_vh_screenrefresh();" src/drivers/cps2.c
+              # CLEAN INJECTION
+              sed -i "1i #include \"fix_cps2.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > Makefile.ps2
           EE_BIN = AVP.ELF
@@ -74,7 +87,6 @@ jobs:
                      -Isrc/sndhrdw -Isrc/vidhrdw -Isrc/cpu/m68000 \
                      -Isrc/cpu/z80 -Isrc/sound -Isrc/drivers
           
-          # Using -fpermissive to ignore the "extern" vs "static" mismatch if it occurs
           EE_CFLAGS += -D_PS2 -DCPS2 -DLSB_FIRST -D__linux__ -DDECL_SPEC= \
                        -fpermissive -fno-strict-aliasing -fno-common \
                        -Wno-implicit-function-declaration -Wno-implicit-int \
@@ -94,3 +106,9 @@ jobs:
           echo "--- BUILDING ---"
           make -f Makefile.ps2 -j1
             '
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: avp-ps2-elf
+          path: AVP.ELF
