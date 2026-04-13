@@ -26,11 +26,17 @@ jobs:
               export PS2SDK=$PS2DEV/ps2sdk
               export PATH=$PATH:$PS2DEV/bin:$PS2DEV/ee/bin:$PS2SDK/bin
 
-              # PHYSICALLY INJECT CORE DEFINITIONS into cps2.c
-              # This provides the missing constants and function prototypes
+              # PHYSICALLY INJECT REFINED DEFINITIONS
               cat << "EOF_FIX" > fix_cps2.h
           #ifndef FIX_CPS2_H
           #define FIX_CPS2_H
+          
+          /* Define dummy structs to satisfy type checking */
+          struct GfxDecodeInfo { int dummy; };
+          struct MemoryReadAddress { int dummy; };
+          struct MemoryWriteAddress { int dummy; };
+          struct QSound_interface { int dummy; };
+
           #include "driver.h"
           
           /* Core Constants */
@@ -41,17 +47,20 @@ jobs:
           #define VIDEO_TYPE_RASTER 1
           #define VIDEO_MODIFIES_PALETTE 2
           
-          /* Extern function pointers and structs expected by cps2.c */
-          extern void *cps1_readmem, *cps1_writemem;
-          extern void *qsound_readmem, *qsound_writemem;
-          extern void *cps1_qsound_interrupt;
-          extern void *cps1_gfxdecodeinfo;
-          extern void *qsound_interface;
-          extern void *cps2_vh_start, *cps2_vh_stop, *cps2_vh_screenrefresh;
+          /* Externs with types that match the MachineDriver structure */
+          extern struct MemoryReadAddress cps1_readmem[], qsound_readmem[];
+          extern struct MemoryWriteAddress cps1_writemem[], qsound_writemem[];
+          extern struct GfxDecodeInfo cps1_gfxdecodeinfo[];
+          extern struct QSound_interface qsound_interface;
+          
+          extern int cps1_qsound_interrupt(void);
+          extern int cps2_vh_start(void);
+          extern void cps2_vh_stop(void);
+          extern void cps2_vh_screenrefresh(void*, int);
+          
           #endif
           EOF_FIX
 
-              # Inject the fix header at the very top
               sed -i "1i #include \"fix_cps2.h\"" src/drivers/cps2.c
 
               cat << "EOF_MAKE" > Makefile.ps2
@@ -80,7 +89,7 @@ jobs:
           printf "#include <stdio.h>\nint main() { return 0; }\n" > ps2_main.c
           
           echo "--- STARTING BUILD ---"
-          make -f Makefile.ps2 -j$(nproc)
+          make -f Makefile.ps2 -j1
             '
 
       - name: Upload ELF
