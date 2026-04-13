@@ -13,7 +13,9 @@ jobs:
 
       - name: Create Build Script
         run: |
+          # Note the #!/bin/sh at the top - critical for Alpine/Docker
           cat << 'EOF' > build_ps2.sh
+          #!/bin/sh
           set -e
           
           echo "--- STEP 1: INSTALLING TOOLS ---"
@@ -66,7 +68,7 @@ jobs:
             -v $(pwd):/src \
             -w /src \
             ps2dev/ps2dev:latest \
-            ./build_ps2.sh
+            sh ./build_ps2.sh
 
       - name: Upload ELF
         uses: actions/upload-artifact@v4
