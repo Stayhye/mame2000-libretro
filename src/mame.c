@@ -168,7 +168,7 @@ int mame_start_game(int game)
 			(options.color_depth != 8 && (Machine->gamedrv->flags & GAME_REQUIRES_16BIT)))
 		Machine->color_depth = 16;
 	else
-		Machine->color_depth = 8;
+		Machine->color_depth = 16;
 
 
     if(!iOS_fixedRes)
