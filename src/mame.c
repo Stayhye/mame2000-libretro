@@ -609,6 +609,7 @@ static int vh_open(void)
 	if (osd_create_display(width,height,Machine->color_depth,
 			drv->frames_per_second,drv->video_attributes,Machine->orientation))
 	{
+		printf("DEBUG FAIL: osd_create_display failed. w=%d, h=%d, depth=%d\n", width, height, Machine->color_depth);
 		vh_close();
 		return 1;
 	}
