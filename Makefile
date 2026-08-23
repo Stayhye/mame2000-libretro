@@ -117,6 +117,17 @@ else
    CC += -miphoneos-version-min=5.0
 endif
 
+# PS2
+else ifeq ($(platform), ps2)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = ee-gcc$(EXE_EXT)
+   CXX = ee-g++$(EXE_EXT)
+   AR = ee-ar$(EXE_EXT)
+   FLAGS += -DPS2 -G0 -DABGR1555
+   STATIC_LINKING = 1
+   STATIC_LINKING_LINK = 1
+   FRONTEND_SUPPORTS_RGB565 = 0
+
 # tvOS
 else ifeq ($(platform), tvos-arm64)
 	TARGET := $(TARGET_NAME)_libretro_tvos.dylib
