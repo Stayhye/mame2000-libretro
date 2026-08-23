@@ -532,11 +532,9 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 	}
 
 	/* Mark the dirty buffers as dirty */
-
 	if (use_dirty)
 	{
 		if (vector_game)
-			/* vector games only use one dirty buffer */
 			init_dirty (0);
 		else
 			init_dirty(1);
@@ -555,7 +553,7 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 
 	vsync_frame_rate = video_fps;
 
-	return 1;
+	return 1; // Force a successful return so video emulation starts properly
 }
 
 /* shut up the display */
