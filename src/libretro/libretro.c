@@ -1208,11 +1208,10 @@ bool retro_load_game(const struct retro_game_info *info)
    }
 #endif
 
-##if (HAS_DRZ80)
+#if (HAS_DRZ80)
     /* Replace Z80 by DRZ80 */
     if (use_drz80)
     {
-        // Temporarily bypass DrZ80 for Aliens (or entirely disable it to test)
         if (strcmp(drivers[game_index]->name, "aliens") != 0)
         {
             for (i=0;i<MAX_CPU;i++)
@@ -1226,20 +1225,21 @@ bool retro_load_game(const struct retro_game_info *info)
         }
     }
 
-	/* Replace Z80 with DRZ80 only for sound CPUs */
-	if (use_drz80_snd)
-	{
-		for (i=0;i<MAX_CPU;i++)
-		{
-			int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
-			if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
-			{
-				*type=((*type)&(~0xff))|CPU_DRZ80;
-			}
-		}
-	}
-#endif
-
+    /* Replace Z80 with DRZ80 only for sound CPUs */
+    if (use_drz80_snd)
+    {
+        if (strcmp(drivers[game_index]->name, "aliens") != 0)
+        {
+            for (i=0;i<MAX_CPU;i++)
+            {
+                int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+                if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
+                {
+                    *type=((*type)&(~0xff))|CPU_DRZ80;
+                }
+            }
+        }
+    }
 #endif
 
    // Remove the mouse usage for certain games
