@@ -71,7 +71,7 @@ int update_audio_latency                 = false;
 
 int should_skip_frame                    = 0;
 
-static int sample_rate                   = 22050;
+static int sample_rate                   = 44100;
 static int stereo_enabled                = true;
 
 int game_index = -1;
@@ -462,6 +462,8 @@ void retro_reset(void)
 
 static void update_input(void)
 {
+	printf("DEBUG: update_input called\n"); // Add this line here
+	
 #define RK(port,key)     input_state_cb(port, RETRO_DEVICE_KEYBOARD, 0,RETROK_##key)
 #define JS(port, button) joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_##button)
 	/* Per-player digital direction bits, in the same GP2X bitmask
