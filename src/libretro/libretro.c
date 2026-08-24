@@ -888,8 +888,14 @@ void retro_run(void)
     * the game's native sound layout; the mixer (mixer.c:mixer_sh_-
     * update) writes interleaved L/R directly into it -- mono games
     * duplicate at the clip step.  No conversion needed here. */
-   if (samples_per_frame && !pause_action)
+   if (samples_buffer && samples_per_frame > 0 && !pause_action)
+   {
       audio_batch_cb(samples_buffer, samples_per_frame);
+   }
+   else
+   {
+      audio_batch_cb(NULL, 0);
+   }
 
    /* If frameskip/timing settings have changed,
     * update frontend audio latency
