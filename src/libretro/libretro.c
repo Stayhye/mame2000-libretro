@@ -897,6 +897,12 @@ void retro_run(void)
     * duplicate at the clip step.  No conversion needed here. */
    if (samples_buffer && samples_per_frame > 0 && !pause_action)
    {
+      // Quick check: are the samples actually non-zero?
+      static int zero_print_guard = 0;
+      if (zero_print_guard < 5) {
+          printf("DEBUG audio sample[0]=%d, sample[1]=%d\n", samples_buffer[0], samples_buffer[1]);
+          zero_print_guard++;
+      }
       audio_batch_cb(samples_buffer, samples_per_frame);
    }
    else
