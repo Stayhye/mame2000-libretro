@@ -44,9 +44,14 @@ void osd_stop_audio_stream(void)
  * caller and passes samples_buffer directly). */
 int osd_update_audio_stream(int16_t *buffer)
 {
-	(void)buffer;
-	hook_audio_done();
-	return samples_per_frame;
+   (void)buffer;
+   static int audio_debug_count = 0;
+   if (audio_debug_count < 5) {
+       printf("DEBUG: osd_update_audio_stream called, samples_per_frame = %d\n", samples_per_frame);
+       audio_debug_count++;
+   }
+   hook_audio_done();
+   return samples_per_frame;
 }
 
 /* Mirror of mame2003-libretro/src/mame2003/mame2003.c:802 osd_update_-
