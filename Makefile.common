@@ -8,7 +8,7 @@ LIBRETRO_COMM_DIR := $(CORE_DIR)/src/libretro/libretro-common
 DEFS        := -DALIGN_INTS -DALIGN_SHORTS $(X86_DEFINES) -DMAME_UNDERCLOCK -DMAME_FASTSOUND -DENABLE_AUTOFIRE -DBIGCASE -D__LIBRETRO__
 INCFLAGS    := -I$(CORE_DIR)/src -I$(CORE_DIR)/src/libretro -I$(LIBRETRO_COMM_DIR)/include
 
-disable everything I don't need for konami games:  # uncomment the following lines to include a CPU core
+# uncomment the following lines to include a CPU core
 CPUS+=Z80@
 #CPUS+=Z80GB@
 CPUS+=8080@
