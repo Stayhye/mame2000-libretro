@@ -783,8 +783,9 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    };
    struct retro_system_timing t = {
       Machine->drv->frames_per_second,
-      (double)Machine->sample_rate
+      44100.0  // Force a standard sample rate here
    };
+   
    info->timing = t;
    info->geometry = g;
 }
