@@ -1155,56 +1155,56 @@ bool retro_load_game(const struct retro_game_info *info)
    int use_drz80 = 1;
    int use_drz80_snd = 1;
 
-	for (i=0;i<NUMGAMES;i++)
- 	{
-		if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
-		{
-			/* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
+    for (i=0;i<NUMGAMES;i++)
+    {
+        if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
+        {
+            /* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
          switch (fe_drivers[i].cores)
          {
          case 0:
             use_cyclone = 0;
-				use_drz80_snd = 0;
-				use_drz80 = 0;
+                use_drz80_snd = 0;
+                use_drz80 = 0;
             break;
          case 1:
-				use_drz80_snd = 0;
-				use_drz80 = 0;
+                use_drz80_snd = 0;
+                use_drz80 = 0;
             break;
          case 2:
             use_cyclone = 0;
             break;
          case 4:
             use_cyclone = 0;
-				use_drz80 = 0;
+                use_drz80 = 0;
             break;
          case 5:
-				use_drz80 = 0;
+                use_drz80 = 0;
             break;
          default:
             break;
          }
-			
+            
          break;
-		}
-	}
+        }
+    }
 
    /* Replace M68000 by CYCLONE */
 #if (HAS_CYCLONE)
    if (use_cyclone)
    {
-	   for (i=0;i<MAX_CPU;i++)
-	   {
-		   int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+        for (i=0;i<MAX_CPU;i++)
+        {
+            int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
 #ifdef NEOMAME
-		   if (((*type)&0xff)==CPU_M68000)
+            if (((*type)&0xff)==CPU_M68000)
 #else
-			   if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
+                if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
 #endif
-			   {
-				   *type=((*type)&(~0xff))|CPU_CYCLONE;
-			   }
-	   }
+                {
+                    *type=((*type)&(~0xff))|CPU_CYCLONE;
+                }
+        }
    }
 #endif
 
@@ -1240,6 +1240,7 @@ bool retro_load_game(const struct retro_game_info *info)
             }
         }
     }
+#endif
 #endif
 
    // Remove the mouse usage for certain games
