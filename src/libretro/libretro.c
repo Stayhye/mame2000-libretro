@@ -792,23 +792,30 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_run(void)
 {
-   input_poll_cb();
-
-   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
-   static int frame_counter = 0;
-   bool skip_this_frame = (frame_counter % 2 != 0);
-
-   // Run the core's native frame execution routine
-   osd_update_video_and_audio();
-
-   // Only push pixels to the frontend display if we aren't skipping this frame
-   if (!skip_this_frame)
-   {
-      video_cb(bitmap_base, display_width, display_height, display_rowbytes);
+	
+	static int frame_count = 0;
+   if (frame_count < 5) {
+       printf("DEBUG: retro_run entry frame %d\n", frame_count++);
    }
+   
+   
+	   input_poll_cb();
 
-   frame_counter++;
-}
+	   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
+	   static int frame_counter = 0;
+	   bool skip_this_frame = (frame_counter % 2 != 0);
+
+	   // Run the core's native frame execution routine
+	   osd_update_video_and_audio();
+
+	   // Only push pixels to the frontend display if we aren't skipping this frame
+	   if (!skip_this_frame)
+	   {
+		  video_cb(bitmap_base, display_width, display_height, display_rowbytes);
+	   }
+
+	   frame_counter++;
+	
    /* Software-framebuffer fast path.
     *
     * Before the emulator runs the next frame, ask the frontend for a
