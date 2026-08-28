@@ -797,6 +797,23 @@ void retro_run(void)
    if (frame_count < 5) {
        printf("DEBUG: retro_run entry frame %d\n", frame_count++);
    }
+   
+   static int frame_counter = 0;
+   bool skip_this_frame = (frame_counter % 2 != 0); // Skip every alternate frame
+
+   // Always run core logic/audio updates to maintain synchronization
+   mame_frame();
+
+   // Only push pixels to the frontend when not skipping
+   if (!skip_this_frame)
+   {
+      video_cb(surf_pixels, width, height, pitch);
+   }
+
+   frame_counter++;
+   
+   input_poll_cb();
+   input_state_cb();
    /* Software-framebuffer fast path.
     *
     * Before the emulator runs the next frame, ask the frontend for a
