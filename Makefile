@@ -544,7 +544,6 @@ ZLIB_INCLUDE := -Isrc/zlib
 endif
 
 INCFLAGS :=
-
 # include the various .mak files
 include Makefile.common
 
@@ -567,32 +566,57 @@ OBJOUT   = -o
 LINKOUT  = -o 
 
 ifneq (,$(findstring msvc,$(platform)))
-	OBJOUT = -Fo
-	LINKOUT = -out:
-	LD = link.exe
+    OBJOUT = -Fo
+    LINKOUT = -out:
+    LD = link.exe
 else
-	LD = $(CC)
+    LD = $(CC)
 endif
+
+ifeq ($(platform), ps2)
+TARGET_SMALL := aliens_mame2000_libretro_ps2.a
+TARGET_ORIG  := all_mame2000_libretro_ps2.a
+
+all: $(TARGET_SMALL) $(TARGET_ORIG)
+
+OBJS_SMALL = $(filter-out driver_orig.o driver_small.o driver.o, $(OBJECTS)) driver_small.o
+OBJS_ORIG  = $(filter-out driver_orig.o driver_small.o driver.o, $(OBJECTS)) driver_orig.o
+
+$(TARGET_SMALL): $(OBJS_SMALL)
+	$(AR) rcs $@ $^
+
+$(TARGET_ORIG): $(OBJS_ORIG)
+	$(AR) rcs $@ $^
+
+driver_small.o: driver_small.c
+	$(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
+
+driver_orig.o: driver_orig.c
+	$(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
+
+else
 
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
-	$(AR) rcs $@ $(OBJECTS)
+    $(AR) rcs $@ $(OBJECTS)
 else
-	$(LD) $(SHARED) $(LDFLAGS) $(OBJECTS) $(LIBS) $(LINKOUT)$@
+    $(LD) $(SHARED) $(LDFLAGS) $(OBJECTS) $(LIBS) $(LINKOUT)$@
+endif
+
 endif
     
 %.o: %.c
-	$(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
+    $(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
 
 %.o: %.s
-	$(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
+    $(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
 
 %.o: %.S
-	$(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
+    $(CC) $(CDEFS) $(CFLAGS) -c $< $(OBJOUT)$@
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+    rm -f $(OBJECTS) $(TARGET) aliens_mame2000_libretro_ps2.a all_mame2000_libretro_ps2.a driver_small.o driver_orig.o
 
 .PHONY: clean
