@@ -462,7 +462,6 @@ void retro_reset(void)
 
 static void update_input(void)
 {
-	printf("DEBUG: update_input called\n"); // Add this line here
 	
 #define RK(port,key)     input_state_cb(port, RETRO_DEVICE_KEYBOARD, 0,RETROK_##key)
 #define JS(port, button) joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_##button)
@@ -905,12 +904,6 @@ void retro_run(void)
     * duplicate at the clip step.  No conversion needed here. */
    if (samples_buffer && samples_per_frame > 0 && !pause_action)
    {
-      // Quick check: are the samples actually non-zero?
-      static int zero_print_guard = 0;
-      if (zero_print_guard < 5) {
-         printf("DEBUG audio sample[0]=%d, sample[1]=%d\n", samples_buffer[0], samples_buffer[1]);
-         zero_print_guard++;
-      }
       audio_batch_cb(samples_buffer, samples_per_frame);
    }
    else
