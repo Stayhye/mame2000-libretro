@@ -792,30 +792,13 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_run(void)
 {
-	
-	static int frame_count = 0;
+   static int frame_count = 0;
    if (frame_count < 5) {
-       printf("DEBUG: retro_run entry frame %d\n", frame_count++);
+      printf("DEBUG: retro_run entry frame %d\n", frame_count++);
    }
-   
-   
-	   input_poll_cb();
 
-	   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
-	   static int frame_counter = 0;
-	   bool skip_this_frame = (frame_counter % 2 != 0);
+   input_poll_cb();
 
-	   // Run the core's native frame execution routine
-	   osd_update_video_and_audio();
-
-	   // Only push pixels to the frontend display if we aren't skipping this frame
-	   if (!skip_this_frame)
-	   {
-		  video_cb(bitmap_base, display_width, display_height, display_rowbytes);
-	   }
-
-	   frame_counter++;
-	
    /* Software-framebuffer fast path.
     *
     * Before the emulator runs the next frame, ask the frontend for a
@@ -872,12 +855,17 @@ void retro_run(void)
          update_variables(false);
    }
 
+   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
+   static int frame_counter = 0;
+   bool skip_this_frame = (frame_counter % 2 != 0);
+   frame_counter++;
+
    /* Run one frame of CPU scheduling.  Returns when the timer system
     * has fired its VBLANK update path through osd_update_video_and_-
     * audio(), which calls hook_video_done() to raise yield_pending. */
    mame_run_one_frame();
 
-   if (should_skip_frame)
+   if (should_skip_frame || skip_this_frame)
       video_cb(NULL, gfx_width, gfx_height, gfx_width * 2);
    else if (mame2000_direct_frame_data != 0)
       /* Bitmap-direct fast path: the just-finished frame skipped the
@@ -895,7 +883,7 @@ void retro_run(void)
     * buffer again next time. */
    if (sw_fb_active_data != NULL)
    {
-      gp2x_screen15     = gp2x_screen15_owned;
+      gp2x_screen15      = gp2x_screen15_owned;
       sw_fb_active_data = NULL;
    }
 
@@ -920,8 +908,8 @@ void retro_run(void)
       // Quick check: are the samples actually non-zero?
       static int zero_print_guard = 0;
       if (zero_print_guard < 5) {
-          printf("DEBUG audio sample[0]=%d, sample[1]=%d\n", samples_buffer[0], samples_buffer[1]);
-          zero_print_guard++;
+         printf("DEBUG audio sample[0]=%d, sample[1]=%d\n", samples_buffer[0], samples_buffer[1]);
+         zero_print_guard++;
       }
       audio_batch_cb(samples_buffer, samples_per_frame);
    }
@@ -933,15 +921,14 @@ void retro_run(void)
    /* If frameskip/timing settings have changed,
     * update frontend audio latency
     * > Can do this before or after the frameskip
-    *   check, but doing it after means we at least
-    *   retain the current frame's audio output */
+    *    check, but doing it after means we at least
+    *    retain the current frame's audio output */
    if (update_audio_latency)
    {
       environ_cb(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
                  &retro_audio_latency);
       update_audio_latency = false;
    }
-
 }
 
 bool retro_load_game(const struct retro_game_info *info)
