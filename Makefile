@@ -124,13 +124,15 @@ else ifeq ($(platform), ps2)
    CXX = mips64r5900el-ps2-elf-g++
    AR = mips64r5900el-ps2-elf-ar
    FLAGS += -DPS2 -G0 -DABGR1555
-   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
-   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -DHAVE_STRLWR -DNO_FAST_SQRT -funroll-loops -ffast-math -DPS2 -DABGR1555
+   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -DHAVE_STRLWR -DNO_FAST_SQRT -funroll-loops -ffast-math -DPS2 -DABGR1555
    STATIC_LINKING=1
    NEED_RWAV = 0
    STATIC_LINKING_LINK = 1
    FRONTEND_SUPPORTS_RGB565 = 0
-
+   HAVE_LOW_MEMORY = 1
+   HAVE_THREADS = 0
+   
 # tvOS
 else ifeq ($(platform), tvos-arm64)
 	TARGET := $(TARGET_NAME)_libretro_tvos.dylib
