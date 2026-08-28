@@ -238,58 +238,58 @@ void parse_cmdline (int argc, char **argv, int game_index)
 	game = game_index;
 
 	/* read graphic configuration */
-	options.use_artwork = get_bool   ("config", "artwork",	NULL,  1);
-	options.use_samples = get_bool   ("config", "samples",	NULL,  1);
-	video_sync  = 0;//get_bool   ("config", "vsync",        NULL,  0);
-	wait_vsync  = 0;//get_bool   ("config", "waitvsync",    NULL,  0);
-	use_dirty	= get_bool	 ("config", "dirty",	NULL,	-1);
-	options.antialias   = get_bool   ("config", "antialias",    NULL,  1);
-	options.translucency = get_bool    ("config", "translucency", NULL, 1);
+   options.use_artwork = get_bool   ("config", "artwork",  NULL,  0);
+   options.use_samples = get_bool   ("config", "samples",  NULL,  0);
+   video_sync  = 0;//get_bool   ("config", "vsync",        NULL,  0);
+   wait_vsync  = 0;//get_bool   ("config", "waitvsync",    NULL,  0);
+   use_dirty   = get_bool   ("config", "dirty",    NULL,   -1);
+   options.antialias   = get_bool   ("config", "antialias",    NULL,  0);
+   options.translucency = get_bool    ("config", "translucency", NULL, 0);
 
-	tmpstr             = get_string ("config", "depth", NULL, "auto");
-	options.color_depth = atoi(tmpstr);
-	if (options.color_depth != 8 && options.color_depth != 16) options.color_depth = 0;	/* auto */
+   tmpstr               = get_string ("config", "depth", NULL, "auto");
+   options.color_depth = atoi(tmpstr);
+   if (options.color_depth != 8 && options.color_depth != 16) options.color_depth = 0; /* auto */
 
-	skiplines   = get_int    ("config", "skiplines",    NULL, 0);
-	skipcolumns = get_int    ("config", "skipcolumns",  NULL, 0);
-	f_beam      = get_float  ("config", "beam",         NULL, 1.5);//TODO
-	if (f_beam < 1.0) f_beam = 1.0;
-	if (f_beam > 16.0) f_beam = 16.0;
-	f_flicker   = get_float  ("config", "flicker",      NULL, 0.0);
-	if (f_flicker < 0.0) f_flicker = 0.0;
-	if (f_flicker > 100.0) f_flicker = 100.0;
-	osd_gamma_correction = get_float ("config", "gamma",   NULL, 1.0);
-	if (osd_gamma_correction < 0.5) osd_gamma_correction = 0.5;
-	if (osd_gamma_correction > 2.0) osd_gamma_correction = 2.0;
+   skiplines   = get_int    ("config", "skiplines",    NULL, 0);
+   skipcolumns = get_int    ("config", "skipcolumns",  NULL, 0);
+   f_beam      = get_float  ("config", "beam",         NULL, 1.5);//TODO
+   if (f_beam < 1.0) f_beam = 1.0;
+   if (f_beam > 16.0) f_beam = 16.0;
+   f_flicker   = get_float  ("config", "flicker",      NULL, 0.0);
+   if (f_flicker < 0.0) f_flicker = 0.0;
+   if (f_flicker > 100.0) f_flicker = 100.0;
+   osd_gamma_correction = get_float ("config", "gamma",   NULL, 1.0);
+   if (osd_gamma_correction < 0.5) osd_gamma_correction = 0.5;
+   if (osd_gamma_correction > 2.0) osd_gamma_correction = 2.0;
 
-	tmpstr = get_string ("config", "frameskip", "fs", "auto");
-	if (!strcasecmp(tmpstr,"auto"))
-	{
-		frameskip = 0;
-		autoframeskip = 1;
-	}
-	else
-	{
-		frameskip = atoi(tmpstr);
-		autoframeskip = 0;
-	}
-	options.norotate  = get_bool ("config", "norotate",  NULL, 0);
-	options.ror       = get_bool ("config", "ror",       NULL, 0);
-	options.rol       = get_bool ("config", "rol",       NULL, 0);
-	options.flipx     = get_bool ("config", "flipx",     NULL, 0);
-	options.flipy     = get_bool ("config", "flipy",     NULL, 0);
+   tmpstr = get_string ("config", "frameskip", "fs", "auto");
+   if (!strcasecmp(tmpstr,"auto"))
+   {
+       frameskip = 0;
+       autoframeskip = 1;
+   }
+   else
+   {
+       frameskip = atoi(tmpstr);
+       autoframeskip = 0;
+   }
+   options.norotate  = get_bool ("config", "norotate",  NULL, 0);
+   options.ror       = get_bool ("config", "ror",       NULL, 0);
+   options.rol       = get_bool ("config", "rol",       NULL, 0);
+   options.flipx     = get_bool ("config", "flipx",     NULL, 0);
+   options.flipy     = get_bool ("config", "flipy",     NULL, 0);
 
-	/* read sound configuration */
-	soundcard           = get_int  ("config", "soundcard",  NULL, -1);
+   /* read sound configuration */
+   soundcard             = get_int  ("config", "soundcard",  NULL, -1);
 
-	options.use_emulated_ym3812 = !get_bool ("config", "ym3812opl",  NULL,  0);
-	options.samplerate = get_int  ("config", "samplerate", "sr", 22050);
-	if (options.samplerate < 5000) options.samplerate = 5000;
-	if (options.samplerate > 44100) options.samplerate = 44100;
-	usestereo           = get_bool ("config", "stereo",  NULL,  0);
-	attenuation         = get_int  ("config", "volume",  NULL,  0);
-	if (attenuation < -32) attenuation = -32;
-	if (attenuation > 0) attenuation = 0;
+   options.use_emulated_ym3812 = !get_bool ("config", "ym3812opl",  NULL,  0);
+   options.samplerate = get_int  ("config", "samplerate", "sr", 11025);
+   if (options.samplerate < 5000) options.samplerate = 5000;
+   if (options.samplerate > 22050) options.samplerate = 22050;
+   usestereo             = get_bool ("config", "stereo",  NULL,  0);
+   attenuation           = get_int  ("config", "volume",  NULL,  0);
+   if (attenuation < -32) attenuation = -32;
+   if (attenuation > 0) attenuation = 0;
 
 	/* read input configuration */
 	use_mouse = get_bool   ("config", "mouse",   NULL,  1);
