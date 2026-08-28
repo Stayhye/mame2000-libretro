@@ -274,7 +274,7 @@ const struct GameDriver *drivers[] =
 	DRIVER( naughtyc )	/* (c) 1982 Jaleco + Cinematronics */
 	DRIVER( popflame )	/* (c) 1982 Jaleco */
 	DRIVER( popflama )	/* (c) 1982 Jaleco */
-TESTDRIVER( popflamb )
+//TESTDRIVER( popflamb )
 
 	/* Namco games (plus some intruders on similar hardware) */
 	DRIVER( geebee )	/* [1978] Namco */
@@ -340,7 +340,7 @@ TESTDRIVER( popflamb )
 	DRIVER( galaga3 )	/* (c) 1984 */
 	DRIVER( galaga3a )	/* (c) 1984 */
 	/* Libble Rabble board (first Japanese game using a 68000) */
-TESTDRIVER( liblrabl )	/* (c) 1983 */
+//TESTDRIVER( liblrabl )	/* (c) 1983 */
 	DRIVER( toypop )	/* (c) 1986 */
 	/* Z8000 games */
 	DRIVER( polepos )	/* (c) 1982  */
@@ -388,7 +388,7 @@ TESTDRIVER( liblrabl )	/* (c) 1983 */
 	DRIVER( berabohm )	/* (c) 1988 (Japan) */
 	/* 1988 Alice in Wonderland (English version of Marchen maze) */
 	DRIVER( mmaze )		/* (c) 1988 (Japan) */
-TESTDRIVER( bakutotu )	/* (c) 1988 */
+//TESTDRIVER( bakutotu )	/* (c) 1988 */
 	DRIVER( wldcourt )	/* (c) 1988 (Japan) */
 	DRIVER( splatter )	/* (c) 1988 (Japan) */
 	DRIVER( faceoff )	/* (c) 1988 (Japan) */
@@ -405,22 +405,22 @@ TESTDRIVER( bakutotu )	/* (c) 1988 */
 	DRIVER( tankfrcj )	/* (c) 1991 (Japan) */
 
 	/* Namco System 2 games */
-TESTDRIVER( finallap )	/* 87.12 Final Lap */
-TESTDRIVER( finalapd )	/* 87.12 Final Lap */
-TESTDRIVER( finalapc )	/* 87.12 Final Lap */
-TESTDRIVER( finlapjc )	/* 87.12 Final Lap */
-TESTDRIVER( finlapjb )	/* 87.12 Final Lap */
+//TESTDRIVER( finallap )	/* 87.12 Final Lap */
+//TESTDRIVER( finalapd )	/* 87.12 Final Lap */
+//TESTDRIVER( finalapc )	/* 87.12 Final Lap */
+//TESTDRIVER( finlapjc )	/* 87.12 Final Lap */
+//TESTDRIVER( finlapjb )	/* 87.12 Final Lap */
 	DRIVER( assault )	/* (c) 1988 */
 	DRIVER( assaultj )	/* (c) 1988 (Japan) */
 	DRIVER( assaultp )	/* (c) 1988 (Japan) */
-TESTDRIVER( metlhawk )	/* (c) 1988 */
+//TESTDRIVER( metlhawk )	/* (c) 1988 */
 	DRIVER( mirninja )	/* (c) 1988 (Japan) */
 	DRIVER( ordyne )	/* (c) 1988 */
 	DRIVER( phelios )	/* (c) 1988 (Japan) */
 	DRIVER( burnforc )	/* (c) 1989 (Japan) */
-TESTDRIVER( dirtfoxj )	/* (c) 1989 (Japan) */
+//TESTDRIVER( dirtfoxj )	/* (c) 1989 (Japan) */
 	DRIVER( finehour )	/* (c) 1989 (Japan) */
-TESTDRIVER( fourtrax )	/* 89.11 */
+//TESTDRIVER( fourtrax )	/* 89.11 */
 	DRIVER( marvland )	/* (c) 1989 (US) */
 	DRIVER( marvlanj )	/* (c) 1989 (Japan) */
 	DRIVER( valkyrie )	/* (c) 1989 (Japan) */
@@ -430,20 +430,20 @@ TESTDRIVER( fourtrax )	/* 89.11 */
 	DRIVER( dsaberj )	/* (c) 1990 (Japan) */
 	DRIVER( rthun2 )	/* (c) 1990 */
 	DRIVER( rthun2j )	/* (c) 1990 (Japan) */
-TESTDRIVER( finalap2 )	/* 90.8  Final Lap 2 */
-TESTDRIVER( finalp2j )	/* 90.8  Final Lap 2 (Japan) */
+//TESTDRIVER( finalap2 )	/* 90.8  Final Lap 2 */
+//TESTDRIVER( finalp2j )	/* 90.8  Final Lap 2 (Japan) */
 	/* 91.3  Steel Gunner */
 	/* 91.7  Golly Ghost */
 	/* 91.9  Super World Stadium */
-TESTDRIVER( sgunner2 )	/* (c) 1991 (Japan) */
+//TESTDRIVER( sgunner2 )	/* (c) 1991 (Japan) */
 	DRIVER( cosmogng )	/* (c) 1991 (US) */
 	DRIVER( cosmognj )	/* (c) 1991 (Japan) */
-TESTDRIVER( finalap3 )	/* 92.9  Final Lap 3 */
-TESTDRIVER( suzuka8h )
+//TESTDRIVER( finalap3 )	/* 92.9  Final Lap 3 */
+//TESTDRIVER( suzuka8h )
 	/* 92.8  Bubble Trouble */
 	DRIVER( sws92 )		/* (c) 1992 (Japan) */
 	/* 93.4  Lucky & Wild */
-TESTDRIVER( suzuk8h2 )
+//TESTDRIVER( suzuk8h2 )
 	DRIVER( sws93 )		/* (c) 1993 (Japan) */
 	/* 93.6  Super World Stadium '93 */
 
@@ -497,7 +497,7 @@ TESTDRIVER( suzuk8h2 )
 	DRIVER( masao )		/* bootleg */
 	DRIVER( hunchbkd )	/* (c) 1983 Century */
 	DRIVER( herbiedk )	/* (c) 1984 CVS */
-TESTDRIVER( herocast )
+//TESTDRIVER( herocast )
 	DRIVER( popeye )
 	DRIVER( popeye2 )
 	DRIVER( popeyebl )	/* bootleg */
@@ -599,7 +599,7 @@ TESTDRIVER( herocast )
 	DRIVER( gorf )		/* (c) 1981 */
 	DRIVER( gorfpgm1 )	/* (c) 1981 */
 	DRIVER( robby )		/* (c) 1981 Bally Midway */
-TESTDRIVER( profpac )	/* (c) 1983 Bally Midway */
+//TESTDRIVER( profpac )	/* (c) 1983 Bally Midway */
 
 	/* Bally Midway MCR games */
 	/* MCR1 */
@@ -732,7 +732,7 @@ Six Flags (?)
 	DRIVER( hharry )	/* (c) 1990 (World) */
 	DRIVER( hharryu )	/* (c) 1990 Irem America (US) */
 	DRIVER( dkgensan )	/* (c) 1990 (Japan) */
-TESTDRIVER( kengo )
+//TESTDRIVER( kengo )
 	DRIVER( poundfor )	/* (c) 1990 (World) */
 	DRIVER( poundfou )	/* (c) 1990 Irem America (US) */
 	DRIVER( airduel )	/* (c) 1990 (Japan) */
@@ -758,20 +758,20 @@ TESTDRIVER( kengo )
 	DRIVER( inthunt )	/* (c) 1993 Irem (World) */
 	DRIVER( inthuntu )	/* (c) 1993 Irem (US) */
 	DRIVER( kaiteids )	/* (c) 1993 Irem (Japan) */
-TESTDRIVER( nbbatman )	/* (c) 1993 Irem America (US) */
-TESTDRIVER( leaguemn )	/* (c) 1993 Irem (Japan) */
+//TESTDRIVER( nbbatman )	/* (c) 1993 Irem America (US) */
+//TESTDRIVER( leaguemn )	/* (c) 1993 Irem (Japan) */
 	DRIVER( lethalth )	/* (c) 1991 Irem (World) */
 	DRIVER( thndblst )	/* (c) 1991 Irem (Japan) */
 	DRIVER( psoldier )	/* (c) 1993 Irem (Japan) */
 	/* M97 */
-TESTDRIVER( riskchal )
-TESTDRIVER( gussun )
-TESTDRIVER( shisen2 )
-TESTDRIVER( quizf1 )
-TESTDRIVER( atompunk )
-TESTDRIVER( bbmanw )
+//TESTDRIVER( riskchal )
+//TESTDRIVER( gussun )
+//TESTDRIVER( shisen2 )
+//TESTDRIVER( quizf1 )
+//TESTDRIVER( atompunk )
+//TESTDRIVER( bbmanw )
 	/* M107 */
-TESTDRIVER( firebarr )	/* (c) 1993 Irem (Japan) */
+//TESTDRIVER( firebarr )	/* (c) 1993 Irem (Japan) */
 	DRIVER( dsoccr94 )	/* (c) 1994 Irem (Data East Corporation license) */
 
 	/* Gottlieb/Mylstar games (Gottlieb became Mylstar in 1983) */
@@ -843,7 +843,7 @@ TESTDRIVER( firebarr )	/* (c) 1993 Irem (Japan) */
 	DRIVER( yamagchi )	/* (c) 1985 Taito */
 	DRIVER( flstory )	/* A45 (c) 1985 Taito Corporation */
 	DRIVER( flstoryj )	/* A45 (c) 1985 Taito Corporation (Japan) */
-TESTDRIVER( onna34ro )	/* A52 */
+//TESTDRIVER( onna34ro )	/* A52 */
 	DRIVER( gladiatr )	/* (c) 1986 Taito America Corporation (US) */
 	DRIVER( ogonsiro )	/* (c) 1986 Taito Corporation (Japan) */
 	DRIVER( lsasquad )	/* A64 (c) 1986 Taito Corporation / Taito America (dip switch) */
@@ -869,9 +869,9 @@ TESTDRIVER( onna34ro )	/* A52 */
 	DRIVER( arknoidu )	/* A75 (c) 1986 Taito America Corporation + Romstar license (US) */
 	DRIVER( arknoidj )	/* A75 (c) 1986 Taito Corporation (Japan) */
 	DRIVER( arkbl2 )	/* bootleg */
-TESTDRIVER( arkbl3 )	/* bootleg */
+//TESTDRIVER( arkbl3 )	/* bootleg */
 	DRIVER( arkatayt )	/* bootleg */
-TESTDRIVER( arkblock )	/* bootleg */
+//TESTDRIVER( arkblock )	/* bootleg */
 	DRIVER( arkbloc2 )	/* bootleg */
 	DRIVER( arkangc )	/* bootleg */
 	DRIVER( arkatour )	/* (c) 1987 Taito America Corporation + Romstar license (US) */
@@ -937,8 +937,8 @@ TESTDRIVER( arkblock )	/* bootleg */
 	DRIVER( finalb )	/* B82 (c) 1988 Taito Corporation Japan (World) */
 	DRIVER( finalbj )	/* B82 (c) 1988 Taito Corporation (Japan) */
 	DRIVER( dondokod )	/* B95 (c) 1989 Taito Corporation (Japan) */
-TESTDRIVER( megab )		/* C11 (c) 1989 Taito Corporation Japan (World) */
-TESTDRIVER( megabj )	/* C11 (c) 1989 Taito Corporation (Japan) */
+//TESTDRIVER( megab )		/* C11 (c) 1989 Taito Corporation Japan (World) */
+//TESTDRIVER( megabj )	/* C11 (c) 1989 Taito Corporation (Japan) */
 	DRIVER( thundfox )	/* C28 (c) 1990 Taito Corporation (Japan) */
 	DRIVER( cameltry )	/* C38 (c) 1989 Taito Corporation (Japan) */
 	DRIVER( cameltru )	/* C38 (c) 1989 Taito America Corporation (US) */
@@ -967,8 +967,8 @@ TESTDRIVER( megabj )	/* C11 (c) 1989 Taito Corporation (Japan) */
 	DRIVER( qzquest )	/* C92 (c) 1991 Taito Corporation (Japan) */
 	DRIVER( pulirula )	/* C98 (c) 1991 Taito Corporation Japan (World) */
 	DRIVER( pulirulj )	/* C98 (c) 1991 Taito Corporation (Japan) */
-TESTDRIVER( metalb )	/* D16? (c) 1991 Taito Corporation Japan (World) */
-TESTDRIVER( metalbj )	/* D12 (c) 1991 Taito Corporation (Japan) */
+//TESTDRIVER( metalb )	/* D16? (c) 1991 Taito Corporation Japan (World) */
+//TESTDRIVER( metalbj )	/* D12 (c) 1991 Taito Corporation (Japan) */
 	DRIVER( qzchikyu )	/* D19 (c) 1991 Taito Corporation (Japan) */
 	DRIVER( yesnoj )	/* D20 (c) 1992 Taito Corporation (Japan) */
 	DRIVER( deadconx )	/* D28 (c) 1992 Taito Corporation Japan (World) */
@@ -1032,7 +1032,7 @@ TESTDRIVER( metalbj )	/* D12 (c) 1991 Taito Corporation (Japan) */
 	DRIVER( pipibibs )	/* TP-025 */
 	DRIVER( pipibibi )	/* (c) 1991 Ryouta Kikaku (bootleg?) */
 	DRIVER( whoopee )	/* TP-025 */
-TESTDRIVER( fixeight )	/* TP-026 (c) 1992 + Taito license */
+//TESTDRIVER( fixeight )	/* TP-026 (c) 1992 + Taito license */
 	DRIVER( vfive )		/* TP-027 (c) 1993 Toaplan (Japan) */
 	DRIVER( grindstm )	/* TP-027 (c) 1993 Toaplan + Unite Trading license (Korea) */
 	DRIVER( batsugun )	/* TP-030 (c) 1993 Toaplan */
@@ -1112,7 +1112,7 @@ V-V                           TP-027
 	DRIVER( defender )	/* (c) 1980 */
 	DRIVER( defendg )	/* (c) 1980 */
 	DRIVER( defendw )	/* (c) 1980 */
-TESTDRIVER( defndjeu )	/* bootleg */
+//TESTDRIVER( defndjeu )	/* bootleg */
 	DRIVER( defcmnd )	/* bootleg */
 	DRIVER( defence )	/* bootleg */
 	DRIVER( mayday )
