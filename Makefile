@@ -116,15 +116,18 @@ ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
 else
    CC += -miphoneos-version-min=5.0
 endif
-
+  
 # PS2
 else ifeq ($(platform), ps2)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = ee-gcc$(EXE_EXT)
-   CXX = ee-g++$(EXE_EXT)
-   AR = ee-ar$(EXE_EXT)
+   CC = mips64r5900el-ps2-elf-gcc
+   CXX = mips64r5900el-ps2-elf-g++
+   AR = mips64r5900el-ps2-elf-ar
    FLAGS += -DPS2 -G0 -DABGR1555
-   STATIC_LINKING = 1
+   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   STATIC_LINKING=1
+   NEED_RWAV = 0
    STATIC_LINKING_LINK = 1
    FRONTEND_SUPPORTS_RGB565 = 0
 
