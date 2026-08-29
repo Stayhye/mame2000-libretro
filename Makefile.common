@@ -182,15 +182,15 @@ SOURCES_C += $(CORE_DIR)/src/png.c
 endif
 
 
-SOURCES_C += $(CORE_DIR)/src/drivers/wardner.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/wardner.c \
 				 $(CORE_DIR)/src/drivers/pacman.c \
 				 $(CORE_DIR)/src/drivers/jrpacman.c \
 				 $(CORE_DIR)/src/drivers/pengo.c \
 				 $(CORE_DIR)/src/drivers/scobra.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/cclimber.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/cclimber.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/seicross.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/seicross.c \
 				 $(CORE_DIR)/src/drivers/wiping.c \
 				 $(CORE_DIR)/src/drivers/cop01.c \
 				 $(CORE_DIR)/src/drivers/locomotn.c \
@@ -209,7 +209,7 @@ SOURCES_C += $(CORE_DIR)/src/drivers/seicross.c \
 				 $(CORE_DIR)/src/drivers/omegrace.c \
 				 $(CORE_DIR)/src/drivers/royalmah.c
 
-SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
+#SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
 				 $(CORE_DIR)/src/sndhrdw/irem.c  \
 				 $(CORE_DIR)/src/sndhrdw/seibu.c \
 				 $(CORE_DIR)/src/sndhrdw/redbaron.c \
@@ -222,83 +222,83 @@ SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
 				 $(CORE_DIR)/src/machine/atari_vg.c  \
 				 $(CORE_DIR)/src/machine/segacrpt.c 
 
-SOURCES_C += $(CORE_DIR)/src/drivers/terracre.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/terracre.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/galivan.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/galivan.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/armedf.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/armedf.c \
 				 $(CORE_DIR)/src/drivers/yamato.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/phoenix.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/phoenix.c \
 				 $(CORE_DIR)/src/drivers/naughtyb.c \
 				 $(CORE_DIR)/src/drivers/safarir.c \
 				 $(CORE_DIR)/src/sndhrdw/pleiads.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/geebee.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/geebee.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/warpwarp.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/warpwarp.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/tankbatt.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/tankbatt.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/galaxian.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/galaxian.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/rallyx.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/rallyx.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/bosco.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/bosco.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/galaga.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/galaga.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/digdug.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/digdug.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/xevious.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/xevious.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/superpac.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/superpac.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/phozon.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/phozon.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/mappy.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/mappy.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/grobda.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/grobda.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/gaplus.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/gaplus.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/toypop.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/toypop.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/polepos.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/polepos.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/pacland.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/pacland.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/skykid.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/skykid.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/baraduke.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/baraduke.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/namcos86.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/namcos86.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/namcos1.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/namcos1.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/namcos2.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/namcos2.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/cosmic.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/cosmic.c \
 				 $(CORE_DIR)/src/drivers/cheekyms.c \
 				 $(CORE_DIR)/src/drivers/ladybug.c \
 				 $(CORE_DIR)/src/drivers/mrdo.c \
 				 $(CORE_DIR)/src/drivers/docastle.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/dkong.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/dkong.c \
 				 $(CORE_DIR)/src/drivers/mario.c \
 				 $(CORE_DIR)/src/drivers/popeye.c \
 				 $(CORE_DIR)/src/drivers/punchout.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/8080bw.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/8080bw.c \
 				 $(CORE_DIR)/src/drivers/m79amb.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/z80bw.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/z80bw.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/lazercmd.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/lazercmd.c \
 				 $(CORE_DIR)/src/drivers/meadows.c \
 				 $(CORE_DIR)/src/drivers/astrocde.c
 
-SOURCES_C += $(CORE_DIR)/src/sndhrdw/mcr.c \
+#SOURCES_C += $(CORE_DIR)/src/sndhrdw/mcr.c \
 				 $(CORE_DIR)/src/machine/mcr.c \
 				 $(CORE_DIR)/src/drivers/mcr68.c \
 				 $(CORE_DIR)/src/vidhrdw/mcr3.c \
@@ -924,53 +924,53 @@ SOURCES_C += $(CORE_DIR)/src/drivers/xmen.c
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/spacefb.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/blueprnt.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/blueprnt.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/dday.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/dday.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/leprechn.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/leprechn.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/hexa.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/hexa.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/redalert.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/redalert.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/irobot.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/irobot.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/spiders.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/spiders.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/stactics.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/stactics.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/sharkatt.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/sharkatt.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/kingobox.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/kingobox.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/zerozone.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/zerozone.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/speedbal.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/speedbal.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/sauro.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/sauro.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/ambush.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/ambush.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/starcrus.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/starcrus.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/goindol.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/goindol.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/meteor.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/meteor.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/aztarac.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/aztarac.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/mole.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/mole.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/gotya.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/gotya.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/mrjong.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/mrjong.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/polyplay.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/polyplay.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/mermaid.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/mermaid.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/magix.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/magix.c
 
 SOURCES_C += $(CORE_DIR)/src/driver.c
 
@@ -1004,7 +1004,7 @@ HAS_AY8910=1
 endif
 
 ifeq ($(HAS_AY8910),1)
-SOURCES_C += $(CORE_DIR)/src/sound/ay8910.c
+#SOURCES_C += $(CORE_DIR)/src/sound/ay8910.c
 endif
 
 # add interfaces
