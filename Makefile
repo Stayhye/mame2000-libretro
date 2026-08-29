@@ -123,8 +123,8 @@ else ifeq ($(platform), ps2)
    CC = mips64r5900el-ps2-elf-gcc
    CXX = mips64r5900el-ps2-elf-g++
    AR = mips64r5900el-ps2-elf-ar
-   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
-   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555 -DNO_FAST_SQRT -DMEMORY_LOW -DHAVE_LOW_MEMORY -DIOAPI_NO_64 -DNDEBUG
+   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555 -DNO_FAST_SQRT -DMEMORY_LOW -DHAVE_LOW_MEMORY -DIOAPI_NO_64 -DNDEBUG
    STATIC_LINKING=1
    NEED_RWAV = 0
  
