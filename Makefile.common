@@ -209,7 +209,7 @@ endif
 				 $(CORE_DIR)/src/drivers/omegrace.c \
 				 $(CORE_DIR)/src/drivers/royalmah.c
 
-#SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
+SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
 				 $(CORE_DIR)/src/sndhrdw/irem.c  \
 				 $(CORE_DIR)/src/sndhrdw/seibu.c \
 				 $(CORE_DIR)/src/sndhrdw/redbaron.c \
@@ -298,7 +298,7 @@ endif
 				 $(CORE_DIR)/src/drivers/meadows.c \
 				 $(CORE_DIR)/src/drivers/astrocde.c
 
-#SOURCES_C += $(CORE_DIR)/src/sndhrdw/mcr.c \
+SOURCES_C += $(CORE_DIR)/src/sndhrdw/mcr.c \
 				 $(CORE_DIR)/src/machine/mcr.c \
 				 $(CORE_DIR)/src/drivers/mcr68.c \
 				 $(CORE_DIR)/src/vidhrdw/mcr3.c \
