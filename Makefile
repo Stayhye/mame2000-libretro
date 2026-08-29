@@ -119,20 +119,14 @@ endif
   
 # PS2
 else ifeq ($(platform), ps2)
-    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
-    CC = mips64r5900el-ps2-elf-gcc$(EXE_EXT)
-    CXX = mips64r5900el-ps2-elf-g++$(EXE_EXT)
-    AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
-    
-    COMMON_FLAGS := -DPS2 -DABGR1555 -DVIDEO_ABGR1555 -DHAVE_STRLWR -DNO_FAST_SQRT -DMEMORY_LOW -DHAVE_LOW_MEMORY -DIOAPI_NO_64 -DNDEBUG -G0 -O3 -fomit-frame-pointer -ffast-math -fno-strict-aliasing
-    
-    CFLAGS += $(COMMON_FLAGS)
-    CXXFLAGS += $(COMMON_FLAGS) -fno-exceptions -fno-rtti
-    
-    HAVE_LOW_MEMORY = 1
-    HAVE_THREADS = 0
-    PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
-    STATIC_LINKING = 1
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = mips64r5900el-ps2-elf-gcc
+   CXX = mips64r5900el-ps2-elf-g++
+   AR = mips64r5900el-ps2-elf-ar
+   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   STATIC_LINKING=1
+   NEED_RWAV = 0
  
 # tvOS
 else ifeq ($(platform), tvos-arm64)
