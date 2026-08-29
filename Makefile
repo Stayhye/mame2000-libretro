@@ -133,9 +133,7 @@ else ifeq ($(platform), ps2)
     HAVE_THREADS = 0
     PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
     STATIC_LINKING = 1
-    VIDEO_RGB565 = 0
-    FRONTEND_SUPPORTS_RGB565 = 0
-   
+ 
 # tvOS
 else ifeq ($(platform), tvos-arm64)
 	TARGET := $(TARGET_NAME)_libretro_tvos.dylib
