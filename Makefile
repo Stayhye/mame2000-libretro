@@ -127,7 +127,8 @@ else ifeq ($(platform), ps2)
    CXXFLAGS += -G0 -O3 -fno-exceptions -fno-rtti -ffast-math -DPS2 -DABGR1555 -DNO_FAST_SQRT -DMEMORY_LOW -DHAVE_LOW_MEMORY -DIOAPI_NO_64 -DNDEBUG -DVIDEO_ABGR1555 -DHAVE_STRLWR
    STATIC_LINKING=1
    NEED_RWAV = 0
- 
+   PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
+	
 # tvOS
 else ifeq ($(platform), tvos-arm64)
 	TARGET := $(TARGET_NAME)_libretro_tvos.dylib
