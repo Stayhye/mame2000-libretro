@@ -108,7 +108,7 @@ SOUNDS+=TMS5220@
 SOUNDS+=ADPCM@
 SOUNDS+=OKIM6295@
 SOUNDS+=MSM5205@
-#SOUNDS+=UPD7759@
+SOUNDS+=UPD7759@
 SOUNDS+=HC55516@
 SOUNDS+=K005289@
 SOUNDS+=K007232@
@@ -1201,6 +1201,12 @@ SOUND=$(strip $(findstring MSM5205@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_MSM5205=1
 SOURCES_C += $(CORE_DIR)/src/sound/msm5205.c
+endif
+
+SOUND=$(strip $(findstring UPD7759@,$(SOUNDS)))
+ifneq ($(SOUND),)
+SOUNDDEFS += -DHAS_UPD7759=1
+SOURCES_C += $(CORE_DIR)/src/sound/upd7759.c
 endif
 
 SOUND=$(strip $(findstring HC55516@,$(SOUNDS)))
