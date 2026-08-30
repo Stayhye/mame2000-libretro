@@ -1198,8 +1198,8 @@ endif
 
 SOUND=$(strip $(findstring ASTROCADE@,$(SOUNDS)))
 ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_ASTROCADE=1
-SOURCES_C += $(CORE_DIR)/src/sound/astrocde.c
+#SOUNDDEFS += -DHAS_ASTROCADE=1
+#SOURCES_C += $(CORE_DIR)/src/sound/astrocde.c
 endif
 
 SOUND=$(strip $(findstring TIA@,$(SOUNDS)))
