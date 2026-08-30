@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "png.h"
 #include "osd_endian.h"
+#include <malloc.h>
 
 /* These globals are only kept on a machine basis - LBO 042898 */
 unsigned int dispensed_tickets;
@@ -20,7 +21,7 @@ data_t flip_screen_x, flip_screen_y;
 
 
 
-void showdisclaimer(void)   /* MAURY_BEGIN: dichiarazione */
+void showdisclaimer(void)    /* MAURY_BEGIN: dichiarazione */
 {
     printf("MAME is an emulator: it reproduces, more or less faithfully, the behaviour of\n"
          "several arcade machines. But hardware is useless without software, so an image\n"
@@ -39,7 +40,7 @@ void showdisclaimer(void)   /* MAURY_BEGIN: dichiarazione */
 
   Arguments:
   const struct RomModule *romp - pointer to an array of Rommodule structures,
-                               as defined in common.h.
+                             as defined in common.h.
 
 ***************************************************************************/
 
@@ -47,13 +48,12 @@ int readroms(void)
 {
     int region;
     const struct RomModule *romp = Machine->gamedrv->rom;
-    int warning = 0;
-    int fatalerror = 0;
     int total_roms = 0;
     int current_rom = 0;
-    char buf[4096] = "";
 
-    if (!romp) return 0;
+    if (!romp) {
+        return 0;
+    }
 
     /* Count total ROMs without allocating heavy stack blocks */
     {
@@ -316,72 +316,37 @@ int readroms(void)
                     romp++;
                 } while (romp->length && (romp->name == 0 || romp->name == (char *)-1));
 
-                if (explength != osd_fsize (f))
-                {
-                    sprintf (&buf[strlen(buf)], "%-12s WRONG LENGTH (expected: %08x found: %08x)\n",
-                            name,explength,osd_fsize(f));
-                    warning = 1;
-                }
-
-                if (expchecksum != osd_fcrc (f))
-                {
-                    warning = 1;
-                    if (expchecksum == 0)
-                        sprintf(&buf[strlen(buf)],"%-12s NO GOOD DUMP KNOWN\n",name);
-                    else if (expchecksum == BADCRC(osd_fcrc(f)))
-                        sprintf(&buf[strlen(buf)],"%-12s ROM NEEDS REDUMP\n",name);
-                    else
-                        sprintf(&buf[strlen(buf)], "%-12s WRONG CRC (expected: %08x found: %08x)\n",
-                                name,expchecksum,osd_fcrc(f));
-                }
-
                 osd_fclose(f);
             }
             else if (romp->length & ROMFLAG_OPTIONAL)
             {
-                sprintf (&buf[strlen(buf)], "OPTIONAL %-12s NOT FOUND\n",name);
                 romp ++;
             }
             else
             {
-                /* allow for a NO GOOD DUMP KNOWN rom to be missing */
-                if (expchecksum == 0)
-                {
-                    sprintf (&buf[strlen(buf)], "%-12s NOT FOUND (NO GOOD DUMP KNOWN)\n",name);
-                    warning = 1;
-                }
-                else
-                {
-                    sprintf (&buf[strlen(buf)], "%-12s NOT FOUND\n",name);
-                    fatalerror = 1;
-                }
-
                 do
                 {
-                    if (fatalerror == 0)
+                    int i;
+
+                    /* fill space with random data */
+                    if (romp->length & ROMFLAG_ALTERNATE)
                     {
-                        int i;
+                        unsigned char *c;
 
-                        /* fill space with random data */
-                        if (romp->length & ROMFLAG_ALTERNATE)
-                        {
-                            unsigned char *c;
+                        /* ROM_LOAD_EVEN and ROM_LOAD_ODD */
+                    #ifdef MSB_FIRST
+                        c = Machine->memory_region[region] + romp->offset;
+                    #else
+                        c = Machine->memory_region[region] + (romp->offset ^ 1);
+                    #endif
 
-                            /* ROM_LOAD_EVEN and ROM_LOAD_ODD */
-                        #ifdef MSB_FIRST
-                            c = Machine->memory_region[region] + romp->offset;
-                        #else
-                            c = Machine->memory_region[region] + (romp->offset ^ 1);
-                        #endif
-
-                            for (i = 0;i < (romp->length & ~ROMFLAG_MASK);i++)
-                                c[2*i] = rand();
-                        }
-                        else
-                        {
-                            for (i = 0;i < (romp->length & ~ROMFLAG_MASK);i++)
-                                Machine->memory_region[region][romp->offset + i] = rand();
-                        }
+                        for (i = 0;i < (romp->length & ~ROMFLAG_MASK);i++)
+                            c[2*i] = rand();
+                    }
+                    else
+                    {
+                        for (i = 0;i < (romp->length & ~ROMFLAG_MASK);i++)
+                            Machine->memory_region[region][romp->offset + i] = rand();
                     }
                     romp++;
                 } while (romp->length && (romp->name == 0 || romp->name == (char *)-1));
@@ -394,30 +359,7 @@ int readroms(void)
     /* final status display */
     osd_display_loading_rom_message(0,current_rom,total_roms);
 
-    if (warning || fatalerror)
-    {
-        extern int bailing;
-
-        if (fatalerror)
-        {
-            strcat (buf, "ERROR: required files are missing, the game cannot be run.\n");
-            bailing = 1;
-        }
-        else
-            strcat (buf, "WARNING: the game might not run correctly.\n");
-        printf ("%s", buf);
-
-        if (!options.gui_host && !bailing)
-        {
-            printf ("Press any key to continue\n");
-            keyboard_read_sync();
-            if (keyboard_pressed(KEYCODE_LCONTROL) && keyboard_pressed(KEYCODE_C))
-                return 1;
-        }
-    }
-
-    if (fatalerror) return 1;
-    else return 0;
+    return 0;
 
 
 getout:
@@ -472,9 +414,9 @@ void printromlist(const struct RomModule *romp,const char *basename)
             } while (romp->length && (romp->name == 0 || romp->name == (char *)-1));
 
             if (expchecksum)
-                printf("%-12s   %7d bytes   %08x\n",name,length,expchecksum);
+                printf("%-12s    %7d bytes    %08x\n",name,length,expchecksum);
             else
-                printf("%-12s   %7d bytes   NO GOOD DUMP KNOWN\n",name,length);
+                printf("%-12s    %7d bytes    NO GOOD DUMP KNOWN\n",name,length);
         }
     }
 }
