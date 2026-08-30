@@ -101,7 +101,7 @@ SOUNDS+=SN76477@
 #SOUNDS+=TIA@
 SOUNDS+=NES@
 SOUNDS+=ASTROCADE@
-SOUNDS+=NAMCO@
+#SOUNDS+=NAMCO@
 #SOUNDS+=TMS36XX@
 SOUNDS+=TMS5220@
 SOUNDS+=VLM5030@
@@ -1207,12 +1207,6 @@ SOUND=$(strip $(findstring NES@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_NES=1
 SOURCES_C += $(CORE_DIR)/src/sound/nes_apu.c
-endif
-
-SOUND=$(strip $(findstring NAMCO@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_NAMCO=1
-SOURCES_C += $(CORE_DIR)/src/sound/namco.c
 endif
 
 SOUND=$(strip $(findstring VLM5030@,$(SOUNDS)))
