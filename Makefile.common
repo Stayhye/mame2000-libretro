@@ -83,8 +83,8 @@ SOUNDS+=DISCRETE@
 SOUNDS+=AY8910@
 SOUNDS+=YM2203@
 # enable only one of the following two
-SOUNDS+=YM2151@
-#SOUNDS+=YM2151_ALT@
+#SOUNDS+=YM2151@
+SOUNDS+=YM2151_ALT@
 SOUNDS+=YM2608@
 SOUNDS+=YM2610@
 SOUNDS+=YM2610B@
@@ -97,7 +97,7 @@ SOUNDS+=YM3526@
 SOUNDS+=Y8950@
 SOUNDS+=SN76477@
 SOUNDS+=SN76496@
-SOUNDS+=POKEY@
+#SOUNDS+=POKEY@
 #SOUNDS+=TIA@
 SOUNDS+=NES@
 SOUNDS+=ASTROCADE@
@@ -182,15 +182,15 @@ SOURCES_C += $(CORE_DIR)/src/png.c
 endif
 
 
-SOURCES_C += $(CORE_DIR)/src/drivers/wardner.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/wardner.c \
 				 $(CORE_DIR)/src/drivers/pacman.c \
 				 $(CORE_DIR)/src/drivers/jrpacman.c \
 				 $(CORE_DIR)/src/drivers/pengo.c \
 				 $(CORE_DIR)/src/drivers/scobra.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/cclimber.c
+#SOURCES_C += $(CORE_DIR)/src/drivers/cclimber.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/seicross.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/seicross.c \
 				 $(CORE_DIR)/src/drivers/wiping.c \
 				 $(CORE_DIR)/src/drivers/cop01.c \
 				 $(CORE_DIR)/src/drivers/locomotn.c \
