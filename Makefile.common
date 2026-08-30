@@ -99,12 +99,12 @@ SOUNDS+=SN76477@
 #SOUNDS+=SN76496@
 #SOUNDS+=POKEY@
 #SOUNDS+=TIA@
-SOUNDS+=NES@
+#SOUNDS+=NES@
 SOUNDS+=ASTROCADE@
 #SOUNDS+=NAMCO@
 #SOUNDS+=TMS36XX@
 SOUNDS+=TMS5220@
-SOUNDS+=VLM5030@
+#SOUNDS+=VLM5030@
 SOUNDS+=ADPCM@
 SOUNDS+=OKIM6295@
 SOUNDS+=MSM5205@
@@ -1201,18 +1201,6 @@ ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_TIA=1
 SOURCES_C += $(CORE_DIR)/src/sound/tiasound.c \
 				 $(CORE_DIR)/src/sound/tiaintf.c
-endif
-
-SOUND=$(strip $(findstring NES@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_NES=1
-SOURCES_C += $(CORE_DIR)/src/sound/nes_apu.c
-endif
-
-SOUND=$(strip $(findstring VLM5030@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_VLM5030=1
-SOURCES_C += $(CORE_DIR)/src/sound/vlm5030.c
 endif
 
 SOUND=$(strip $(findstring MSM5205@,$(SOUNDS)))
