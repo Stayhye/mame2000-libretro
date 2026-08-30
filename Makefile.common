@@ -1140,8 +1140,8 @@ endif
 
 SOUND=$(strip $(findstring POKEY@,$(SOUNDS)))
 ifneq ($(SOUND),)
-#SOUNDDEFS += -DHAS_POKEY=1
-#SOURCES_C += $(CORE_DIR)/src/sound/pokey.c
+SOUNDDEFS += -DHAS_POKEY=1
+SOURCES_C += $(CORE_DIR)/src/sound/pokey.c
 endif
 
 SOUND=$(strip $(findstring QSOUND@,$(SOUNDS)))
@@ -1176,8 +1176,8 @@ endif
 
 SOUND=$(strip $(findstring SEGAPCM@,$(SOUNDS)))
 ifneq ($(SOUND),)
-#SOUNDDEFS += -DHAS_SEGAPCM=1
-#SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
+SOUNDDEFS += -DHAS_SEGAPCM=1
+SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
 endif
 
 SOUND=$(strip $(findstring DISCRETE@,$(SOUNDS)))
