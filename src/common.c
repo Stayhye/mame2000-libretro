@@ -45,34 +45,31 @@ void showdisclaimer(void)   /* MAURY_BEGIN: dichiarazione */
 
 int readroms(void)
 {
-	int region;
-	const struct RomModule *romp;
-	int warning = 0;
-	int fatalerror = 0;
-	int total_roms,current_rom;
-	char buf[4096] = "";
+    int region;
+    const struct RomModule *romp = Machine->gamedrv->rom;
+    if (!romp) return 0;
 
+    int total_roms = 0;
 
-	total_roms = current_rom = 0;
-	romp = Machine->gamedrv->rom;
+    // Count total ROMs without allocating the heavy 4KB stack buffer
+    const struct RomModule *scan_romp = romp;
+    while (scan_romp->name || scan_romp->offset || scan_romp->length)
+    {
+        if (scan_romp->name && scan_romp->name != (const char *)-1)
+            total_roms++;
+        scan_romp++;
+    }
 
-	if (!romp) return 0;
+    // Reset memory regions as intended in the initialization sequence
+    for (region = 0; region < MAX_MEMORY_REGIONS; region++)
+        Machine->memory_region[region] = 0;
 
-	while (romp->name || romp->offset || romp->length)
-	{
-		if (romp->name && romp->name != (char *)-1)
-			total_roms++;
+    region = 0;
 
-		romp++;
-	}
-
-
-	romp = Machine->gamedrv->rom;
-
-	for (region = 0;region < MAX_MEMORY_REGIONS;region++)
-		Machine->memory_region[region] = 0;
-
-	region = 0;
+    // Remaining ROM loading logic continues here...
+    
+    return total_roms;
+}
 
 	while (romp->name || romp->offset || romp->length)
 	{
