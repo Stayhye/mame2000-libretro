@@ -209,18 +209,8 @@ endif
 				 $(CORE_DIR)/src/drivers/omegrace.c \
 				 $(CORE_DIR)/src/drivers/royalmah.c
 
-SOURCES_C += $(CORE_DIR)/src/sndhrdw/atarijsa.c  \
-				 $(CORE_DIR)/src/sndhrdw/irem.c  \
-				 $(CORE_DIR)/src/sndhrdw/seibu.c \
-				 $(CORE_DIR)/src/sndhrdw/redbaron.c \
-				 $(CORE_DIR)/src/sndhrdw/llander.c \
-				 $(CORE_DIR)/src/vidhrdw/llander.c \
-				 $(CORE_DIR)/src/vidhrdw/konamiic.c  \
-				 $(CORE_DIR)/src/vidhrdw/taitoic.c  \
-				 $(CORE_DIR)/src/machine/atarigen.c  \
-				 $(CORE_DIR)/src/machine/slapstic.c  \
-				 $(CORE_DIR)/src/machine/atari_vg.c  \
-				 $(CORE_DIR)/src/machine/segacrpt.c 
+SOURCES_C += $(CORE_DIR)/src/vidhrdw/konamiic.c  \
+				 
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/terracre.c
 
