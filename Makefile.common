@@ -209,7 +209,7 @@ endif
 				 $(CORE_DIR)/src/drivers/omegrace.c \
 				 $(CORE_DIR)/src/drivers/royalmah.c
 
-SOURCES_C += $(CORE_DIR)/src/vidhrdw/konamiic.c  \
+SOURCES_C += $(CORE_DIR)/src/vidhrdw/konamiic.c
 				 
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/terracre.c
@@ -279,28 +279,17 @@ SOURCES_C += $(CORE_DIR)/src/vidhrdw/konamiic.c  \
 				 $(CORE_DIR)/src/drivers/popeye.c \
 				 $(CORE_DIR)/src/drivers/punchout.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/8080bw.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/8080bw.c \
 				 $(CORE_DIR)/src/drivers/m79amb.c
 
 SOURCES_C += $(CORE_DIR)/src/drivers/z80bw.c
 
-SOURCES_C += $(CORE_DIR)/src/drivers/lazercmd.c \
+#SOURCES_C += $(CORE_DIR)/src/drivers/lazercmd.c \
 				 $(CORE_DIR)/src/drivers/meadows.c \
 				 $(CORE_DIR)/src/drivers/astrocde.c
 
-SOURCES_C += $(CORE_DIR)/src/sndhrdw/mcr.c \
-				 $(CORE_DIR)/src/machine/mcr.c \
-				 $(CORE_DIR)/src/drivers/mcr68.c \
-				 $(CORE_DIR)/src/vidhrdw/mcr3.c \
-				 $(CORE_DIR)/src/drivers/balsente.c \
-				 $(CORE_DIR)/src/sndhrdw/carnival.c \
-				 $(CORE_DIR)/src/drivers/hal21.c \
-				 $(CORE_DIR)/src/sndhrdw/gorf.c \
-				 $(CORE_DIR)/src/machine/cchip.c \
-				 $(CORE_DIR)/src/machine/konami.c \
-				 $(CORE_DIR)/src/sndhrdw/pulsar.c \
-				 $(CORE_DIR)/src/sndhrdw/depthch.c \
-				 $(CORE_DIR)/src/sndhrdw/invinco.c
+SOURCES_C += $(CORE_DIR)/src/machine/konami.c 
+				
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/skychut.c
 
@@ -1151,8 +1140,8 @@ endif
 
 SOUND=$(strip $(findstring POKEY@,$(SOUNDS)))
 ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_POKEY=1
-SOURCES_C += $(CORE_DIR)/src/sound/pokey.c
+#SOUNDDEFS += -DHAS_POKEY=1
+#SOURCES_C += $(CORE_DIR)/src/sound/pokey.c
 endif
 
 SOUND=$(strip $(findstring QSOUND@,$(SOUNDS)))
@@ -1187,8 +1176,8 @@ endif
 
 SOUND=$(strip $(findstring SEGAPCM@,$(SOUNDS)))
 ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_SEGAPCM=1
-SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
+#SOUNDDEFS += -DHAS_SEGAPCM=1
+#SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
 endif
 
 SOUND=$(strip $(findstring DISCRETE@,$(SOUNDS)))
