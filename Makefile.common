@@ -119,7 +119,7 @@ SOUNDS+=SEGAPCM@
 SOUNDS+=RF5C68@
 SOUNDS+=CEM3394@
 SOUNDS+=C140@
-SOUNDS+=QSOUND@
+#SOUNDS+=QSOUND@
 #SOUNDS+=SPEAKER@
 #SOUNDS+=WAVE@
 # the core object files (without target specific objects;
@@ -1136,12 +1136,6 @@ SOUND=$(strip $(findstring YMZ280B@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_YMZ280B=1
 SOURCES_C += $(CORE_DIR)/src/sound/ymz280b.c
-endif
-
-SOUND=$(strip $(findstring QSOUND@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_QSOUND=1
-SOURCES_C += $(CORE_DIR)/src/sound/qsound.c
 endif
 
 SOUND=$(strip $(findstring SN76477@,$(SOUNDS)))
