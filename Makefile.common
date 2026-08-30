@@ -54,8 +54,8 @@ CPUS+=M68000@
 CPUS+=M68010@
 CPUS+=M68EC020@
 CPUS+=M68020@
-CPUS+=T11@
-CPUS+=S2650@
+#CPUS+=T11@
+#CPUS+=S2650@
 CPUS+=TMS34010@
 #CPUS+=TMS9900@
 #CPUS+=TMS9940@
@@ -1581,18 +1581,6 @@ endif
 
 ifeq ($(HAS_M68KMAME),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m68000/m68kmame.c
-endif
-
-CPU=$(strip $(findstring T11@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_T11=1
-SOURCES_C += $(CORE_DIR)/src/cpu/t11/t11.c
-endif
-
-CPU=$(strip $(findstring S2650@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_S2650=1
-SOURCES_C += $(CORE_DIR)/src/cpu/s2650/s2650.c
 endif
 
 CPU=$(strip $(findstring TMS34010@,$(CPUS)))
