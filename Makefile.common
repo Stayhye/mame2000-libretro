@@ -34,7 +34,7 @@ CPUS+=V20@
 CPUS+=V30@
 CPUS+=V33@
 #CPUS+=I8035@
-CPUS+=I8039@
+#CPUS+=I8039@
 #CPUS+=I8048@
 #CPUS+=N7751@
 CPUS+=M6800@
@@ -1441,16 +1441,6 @@ endif
 
 ifeq ($(HAS_NEC),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/nec/nec.c
-endif
-
-CPU=$(strip $(findstring I8039@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I8039=1
-HAS_I8039=1
-endif
-
-ifeq ($(HAS_I8039),1)
-SOURCES_C += $(CORE_DIR)/src/cpu/i8039/i8039.c
 endif
 
 CPU=$(strip $(findstring M6800@,$(CPUS)))
