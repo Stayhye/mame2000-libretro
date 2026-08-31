@@ -35,7 +35,7 @@ CPUS+=V30@
 CPUS+=V33@
 #CPUS+=I8035@
 CPUS+=I8039@
-CPUS+=I8048@
+#CPUS+=I8048@
 CPUS+=N7751@
 CPUS+=M6800@
 CPUS+=M6801@
@@ -1446,12 +1446,6 @@ endif
 CPU=$(strip $(findstring I8039@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_I8039=1
-HAS_I8039=1
-endif
-
-CPU=$(strip $(findstring I8048@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I8048=1
 HAS_I8039=1
 endif
 
