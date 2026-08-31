@@ -59,7 +59,7 @@ CPUS+=M68020@
 CPUS+=TMS34010@
 #CPUS+=TMS9900@
 #CPUS+=TMS9940@
-CPUS+=TMS9980@
+#CPUS+=TMS9980@
 #CPUS+=TMS9985@
 #CPUS+=TMS9989@
 #CPUS+=TMS9995@
@@ -1587,54 +1587,6 @@ CPU=$(strip $(findstring TMS34010@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_TMS34010=1
 SOURCES_C += $(CORE_DIR)/src/cpu/tms34010/tms34010.c
-endif
-
-CPU=$(strip $(findstring TMS9900@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9900=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9900.c
-endif
-
-CPU=$(strip $(findstring TMS9940@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9940=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9900.c
-endif
-
-CPU=$(strip $(findstring TMS9980@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9980=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9980a.c
-endif
-
-CPU=$(strip $(findstring TMS9985@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9985=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9980a.c
-endif
-
-CPU=$(strip $(findstring TMS9989@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9989=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9980a.c
-endif
-
-CPU=$(strip $(findstring TMS9995@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS9995=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9995.c
-endif
-
-CPU=$(strip $(findstring TMS99105A@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS99105A=1
-SOURCES_C += $(CORE_DIR)/src/cpu/tms9900/tms9995.c
-endif
-
-CPU=$(strip $(findstring TMS99105A@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_TMS99105A=1
-SOURCES_C += $(CORE_DIR)/cpu/tms9900/tms9995.c
 endif
 
 CPU=$(strip $(findstring Z8000@,$(CPUS)))
