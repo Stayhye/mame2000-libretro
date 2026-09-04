@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 int he_did_cheat = 0;
 char *cheatfile = NULL;
 
