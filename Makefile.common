@@ -41,10 +41,10 @@ CPUS+=MIPS@
 
 # uncomment the following lines to include a sound core
 SOUNDS+=CUSTOM@
-SOUNDS+=SAMPLES@
+#SOUNDS+=SAMPLES@
 SOUNDS+=DAC@
-SOUNDS+=DISCRETE@
-SOUNDS+=AY8910@
+#SOUNDS+=DISCRETE@
+#SOUNDS+=AY8910@
 SOUNDS+=YM2203@
 # enable only one of the following two
 #SOUNDS+=YM2151@
@@ -54,11 +54,7 @@ SOUNDS+=YM2608@
 #SOUNDS+=YM2610B@
 #SOUNDS+=YM2413@
 #SOUNDS+=YM3812@
-#SOUNDS+=YM3526@
-#SOUNDS+=Y8950@
-#SOUNDS+=SN76477@
 #SOUNDS+=TIA@
-#SOUNDS+=NES@
 SOUNDS+=ASTROCADE@
 SOUNDS+=TMS5220@
 SOUNDS+=ADPCM@
@@ -72,8 +68,6 @@ SOUNDS+=K051649@
 SOUNDS+=K053260@
 SOUNDS+=K054539@
 SOUNDS+=SEGAPCM@
-#SOUNDS+=RF5C68@
-#SOUNDS+=CEM3394@
 
 SOUNDS+=QSOUND@
 
@@ -720,19 +714,6 @@ HAS_FMOPL=1
 HAS_YM3812=1
 endif
 
-ifneq ($(strip $(findstring YM3526@,$(SOUNDS))),)
-SOUNDDEFS += -DHAS_YM3526=1
-HAS_FMOPL=1
-HAS_YM3812=1
-endif
-
-SOUND=$(strip $(findstring Y8950@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_Y8950=1
-HAS_FMOPL=1
-HAS_YM3812=1
-endif
-
 ifeq ($(HAS_YM3812),1)
 SOURCES_C += $(CORE_DIR)/src/sound/3812intf.c
 endif
@@ -855,18 +836,6 @@ SOUND=$(strip $(findstring K054539@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_K054539=1
 SOURCES_C += $(CORE_DIR)/src/sound/k054539.c
-endif
-
-SOUND=$(strip $(findstring RF5C68@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_RF5C68=1
-SOURCES_C += $(CORE_DIR)/src/sound/rf5c68.c
-endif
-
-SOUND=$(strip $(findstring CEM3394@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_CEM3394=1
-SOURCES_C += $(CORE_DIR)/src/sound/cem3394.c
 endif
 
 SOUND=$(strip $(findstring C140@,$(SOUNDS)))
