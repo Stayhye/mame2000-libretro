@@ -41,7 +41,7 @@ CPUS+=MIPS@
 
 # uncomment the following lines to include a sound core
 SOUNDS+=CUSTOM@
-#SOUNDS+=SAMPLES@
+SOUNDS+=SAMPLES@
 SOUNDS+=DAC@
 #SOUNDS+=DISCRETE@
 #SOUNDS+=AY8910@
