@@ -46,7 +46,7 @@ CPUS+=M6809@
 CPUS+=KONAMI@
 CPUS+=M68000@
 CPUS+=M68010@
-CPUS+=M68EC020@
+#CPUS+=M68EC020@
 CPUS+=M68020@
 CPUS+=TMS34010@
 CPUS+=Z8000@
@@ -1135,12 +1135,6 @@ endif
 CPU=$(strip $(findstring M68010@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_M68010=1
-HAS_M68KMAME=1
-endif
-
-CPU=$(strip $(findstring M68EC020@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_M68EC020=1
 HAS_M68KMAME=1
 endif
 
