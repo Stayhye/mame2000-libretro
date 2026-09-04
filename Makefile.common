@@ -82,7 +82,7 @@ SOURCES_C += $(CORE_DIR)/src/version.c \
 				$(CORE_DIR)/src/artwork.c \
 				$(CORE_DIR)/src/unzip.c \
 				$(CORE_DIR)/src/profiler.c \
-				#$(CORE_DIR)/src/cheat.c \
+				$(CORE_DIR)/src/cheat.c \
 				$(CORE_DIR)/src/hiscore.c \
 				$(CORE_DIR)/src/input.c \
 				$(CORE_DIR)/src/inptport.c \
