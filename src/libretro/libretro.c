@@ -30,14 +30,6 @@ char slash = '\\';
 char slash = '/';
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
 char *IMAMEBASEPATH = NULL;
 char *IMAMESAMPLEPATH = NULL;
 
@@ -921,7 +913,7 @@ void retro_run(void)
       size_t total_audio_bytes = samples_per_frame * 4; // Stereo: 2 channels * 2 bytes per sample
       uint64_t *audio_d64 = (uint64_t *)samples_buffer;
       int audio_chunks = total_audio_bytes >> 3;
-      //int audio_rem = total_audio_bytes & 7;
+      int audio_rem = total_audio_bytes & 7;
 
       int ai = 0;
       for (; ai <= audio_chunks - 4; ai += 4)

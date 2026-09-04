@@ -66,8 +66,8 @@ ifeq ($(platform), ps2)
    CC = mips64r5900el-ps2-elf-gcc
    CXX = mips64r5900el-ps2-elf-g++
    AR = mips64r5900el-ps2-elf-ar
-   CFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -flto
-   CXXFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -flto
+   CFLAGS += -O3 -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -flto
+   CXXFLAGS += -O3 -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -flto
    STATIC_LINKING=1
    PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
 
