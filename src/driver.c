@@ -1958,7 +1958,7 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	//DRIVER( ironhors )	/* GX560 (c) 1986 */
 	//DRIVER( dairesya )	/* GX560 (c) 1986 (Japan) */
 	//DRIVER( farwest )
-	DRIVER( jackal )	/* GX631 (c) 1986 (World) */
+	//DRIVER( jackal )	/* GX631 (c) 1986 (World) */
 	//DRIVER( topgunr )	/* GX631 (c) 1986 (US) */
 	//DRIVER( jackalj )	/* GX631 (c) 1986 (Japan) */
 	//DRIVER( topgunbl )	/* bootleg */
