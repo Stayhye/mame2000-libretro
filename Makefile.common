@@ -13,12 +13,7 @@ CPUS+=Z80@
 #CPUS+=Z80GB@
 CPUS+=8080@
 CPUS+=M6502@
-#CPUS+=M6509@
 CPUS+=M6510@
-#CPUS+=M7501@
-#CPUS+=M4510@
-#CPUS+=N2A03@
-#CPUS+=H6280@
 #CPUS+=I86@
 #CPUS+=I88@
 #CPUS+=I186@
@@ -929,12 +924,6 @@ CPU=$(strip $(findstring M6502@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_M6502=1
 HAS_M6502=1
-endif
-
-CPU=$(strip $(findstring M6509@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_M6509=1
-SOURCES_C += $(CORE_DIR)/src/cpu/m6502/m6509.c
 endif
 
 CPU=$(strip $(findstring M6510@,$(CPUS)))

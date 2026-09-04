@@ -277,30 +277,6 @@ Konami System GX game list
 1997.07 Winning Spike (GX705)
 1997.11 Rushing Heroes (GX?. Not released in Japan)
 */
-	//DRIVER( kof97 )		/* 0232 (c) 1997 SNK */
-	//DRIVER( magdrop3 )	/* 0233 (c) 1997 Data East Corporation */
-	//DRIVER( lastblad )	/* 0234 (c) 1997 SNK */
-	//DRIVER( puzzldpr )	/* 0235 (c) 1997 Taito (Visco license) */
-	//DRIVER( irrmaze )	/* 0236 (c) 1997 SNK / Saurus */
-	//DRIVER( popbounc )	/* 0237 (c) 1997 Video System Co. */
-	//DRIVER( shocktro )	/* 0238 (c) 1997 Saurus */
-	//DRIVER( blazstar )	/* 0239 (c) 1998 Yumekobo */
-	//DRIVER( rbff2 )		/* 0240 (c) 1998 SNK */
-	//DRIVER( mslug2 )	/* 0241 (c) 1998 SNK */
-	//DRIVER( kof98 )		/* 0242 (c) 1998 SNK */
-	//DRIVER( lastbld2 )	/* 0243 (c) 1998 SNK */
-	//DRIVER( neocup98 )	/* 0244 (c) 1998 SNK */
-	//DRIVER( breakrev )	/* 0245 (c) 1998 Visco */
-	//DRIVER( shocktr2 )	/* 0246 (c) 1998 Saurus */
-	//DRIVER( flipshot )	/* 0247 (c) 1998 Visco */
-//TESTDRIVER( pbobbl2n )	/* 0248 (c) 1999 Taito (SNK license) */
-//TESTDRIVER( ctomaday )	/* 0249 (c) 1999 Visco */
-//TESTDRIVER( mslugx )	/* 0250 (c) 1999 SNK */
-//TESTDRIVER( kof99 )		/* 0251 (c) 1999 SNK */
-//TESTDRIVER( garou )		/* 0253 (c) 1999 SNK */
-	/* Prehistoric Isle 2 */
-	/* Strikers 1945 Plus */
-	/* Ganryu */
 
 //#endif /* NEOMAME */
 
