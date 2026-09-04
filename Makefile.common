@@ -30,7 +30,6 @@ CPUS+=M68EC020@
 CPUS+=M68020@
 CPUS+=TMS34010@
 CPUS+=Z8000@
-#CPUS+=SC61860@
 #CPUS+=ARM@
 
 # uncomment the following lines to include a sound core
@@ -40,8 +39,8 @@ SOUNDS+=DAC@
 #SOUNDS+=AY8910@
 SOUNDS+=YM2203@
 # enable only one of the following two
-#SOUNDS+=YM2151@
-SOUNDS+=YM2151_ALT@
+SOUNDS+=YM2151@
+#SOUNDS+=YM2151_ALT@
 SOUNDS+=YM2608@
 #SOUNDS+=YM2610@
 #SOUNDS+=YM2413@
@@ -977,12 +976,6 @@ CPU=$(strip $(findstring Z8000@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_Z8000=1
 SOURCES_C += $(CORE_DIR)/src/cpu/z8000/z8000.c
-endif
-
-CPU=$(strip $(findstring SC61860@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_SC61860=1
-SOURCES_C += $(CORE_DIR)/src/cpu/sc61860/sc61860.c
 endif
 
 CPU=$(strip $(findstring ARM@,$(CPUS)))
