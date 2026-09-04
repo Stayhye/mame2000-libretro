@@ -243,16 +243,12 @@ static void retro_set_audio_buff_status_cb(void)
       }
       else
       {
-         /* Frameskip is enabled - increase frontend
-          * audio latency to minimise potential
-          * buffer underruns */
-         uint32_t frame_time_usec = 1000000.0 / Machine->drv->frames_per_second;
+         // Use integer math to avoid slow floating-point division on the R5900
+         uint32_t fps = (uint32_t)Machine->drv->frames_per_second;
+         uint32_t frame_time_usec = fps ? (1000000UL / fps) : 16639UL;
 
-         /* Set latency to 6x current frame time... */
-         retro_audio_latency = (unsigned)(6 * frame_time_usec / 1000);
-
-         /* ...then round up to nearest multiple of 32 */
-         retro_audio_latency = (retro_audio_latency + 0x1F) & ~0x1F;
+         // Set latency to 6x current frame time, rounded up to nearest multiple of 32
+         retro_audio_latency = (unsigned)(((6 * frame_time_usec / 1000) + 0x1F) & ~0x1F);
       }
    }
    else
