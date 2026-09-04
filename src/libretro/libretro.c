@@ -791,12 +791,6 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_run(void)
 {
-   static int frame_count = 0;
-   if (frame_count < 5) {
-      printf("DEBUG: retro_run entry frame %d\n", frame_count++);
-   }
-
-   input_poll_cb();
 
    /* Software-framebuffer fast path.
     *
