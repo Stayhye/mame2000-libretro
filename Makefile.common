@@ -24,7 +24,7 @@ CPUS+=M6510@
 #CPUS+=M8502@
 #CPUS+=M4510@
 CPUS+=N2A03@
-CPUS+=H6280@
+#CPUS+=H6280@
 CPUS+=I86@
 #CPUS+=I88@
 CPUS+=I186@
@@ -1351,22 +1351,10 @@ ifeq ($(HAS_M6502),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m6502/m6502.c
 endif
 
-CPU=$(strip $(findstring M4510@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_M4510=1
-SOURCES_C += $(CORE_DIR)/src/cpu/m6502/m4510.c
-endif
-
 CPU=$(strip $(findstring N2A03@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_N2A03=1
 HAS_M6502=1
-endif
-
-CPU=$(strip $(findstring H6280@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_H6280=1
-SOURCES_C += $(CORE_DIR)/src/cpu/h6280/h6280.c
 endif
 
 CPU=$(strip $(findstring I86@,$(CPUS)))
