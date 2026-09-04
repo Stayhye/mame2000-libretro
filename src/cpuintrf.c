@@ -1499,8 +1499,8 @@ int ignore_interrupt(void)
 
 #include "driver.h"
 
-/* Generate a trigger (inlined to eliminate function call overhead in tight execution loops) */
-static inline void cpu_trigger(int trigger)
+/* Generate a trigger */
+void cpu_trigger(int trigger)
 {
    timer_trigger(trigger);
 }
@@ -1508,7 +1508,7 @@ static inline void cpu_trigger(int trigger)
 /* Generate a trigger after a specific period of time */
 void cpu_triggertime(timer_tm duration, int trigger)
 {
-   timer_set(duration, trigger, (void (*)(int))cpu_trigger);
+   timer_set(duration, trigger, cpu_trigger);
 }
 
 /* Burn CPU cycles until a timer trigger */
@@ -1571,13 +1571,12 @@ void cpu_yielduntil_time(timer_tm duration)
    timetrig = (timetrig + 1) & 255;
 }
 
-/* Fast inline getters to prevent stack frame overhead on frequent polling */
-static inline int cpu_getvblank(void)
+int cpu_getvblank(void)
 {
    return vblank;
 }
 
-static inline int cpu_getcurrentframe(void)
+int cpu_getcurrentframe(void)
 {
    return current_frame;
 }
