@@ -30,7 +30,7 @@ CPUS+=I86@
 CPUS+=I186@
 #CPUS+=I188@
 #CPUS+=I288@
-CPUS+=V20@
+#CPUS+=V20@
 CPUS+=V30@
 CPUS+=V33@
 #CPUS+=I8035@
@@ -1407,12 +1407,6 @@ endif
 
 ifeq ($(HAS_I86),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/i86/i86.c
-endif
-
-CPU=$(strip $(findstring V20@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_V20=1
-HAS_NEC=1
 endif
 
 CPU=$(strip $(findstring V30@,$(CPUS)))
