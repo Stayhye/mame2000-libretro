@@ -761,10 +761,14 @@ void m68k_pulse_reset(void)
 #endif /* M68K_EMULATE_PREFETCH */
 
 	/* Read the initial stack pointer and program counter */
-	m68ki_jump(0);
-	REG_SP = m68ki_read_imm_32();
-	REG_PC = m68ki_read_imm_32();
-	m68ki_jump(REG_PC);
+    m68ki_jump(0);
+    REG_SP = m68ki_read_imm_32();
+    REG_PC = m68ki_read_imm_32();
+    
+    // Add logging hook here to verify values before execution branches
+    fprintf(stderr, "M68K RESET -- SP: 0x%08X | PC: 0x%08X\n", REG_SP, REG_PC);
+
+    m68ki_jump(REG_PC);
 }
 
 /* Pulse the HALT line on the CPU */
