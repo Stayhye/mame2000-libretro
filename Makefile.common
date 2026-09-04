@@ -20,7 +20,6 @@ CPUS+=M6802@
 CPUS+=M6803@
 CPUS+=M6808@
 #CPUS+=HD63701@
-#CPUS+=NSC8105@
 CPUS+=M6805@
 CPUS+=M68705@
 #CPUS+=HD6309@
@@ -32,10 +31,6 @@ CPUS+=M68EC020@
 CPUS+=M68020@
 CPUS+=TMS34010@
 CPUS+=Z8000@
-#CPUS+=CCPU@
-#CPUS+=ADSP2100@
-#CPUS+=ADSP2105@
-#CPUS+=MIPS@
 #CPUS+=SC61860@
 #CPUS+=ARM@
 
@@ -43,7 +38,6 @@ CPUS+=Z8000@
 SOUNDS+=CUSTOM@
 SOUNDS+=SAMPLES@
 SOUNDS+=DAC@
-#SOUNDS+=DISCRETE@
 #SOUNDS+=AY8910@
 SOUNDS+=YM2203@
 # enable only one of the following two
@@ -749,12 +743,6 @@ SOUNDDEFS += -DHAS_SEGAPCM=1
 SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
 endif
 
-SOUND=$(strip $(findstring DISCRETE@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_DISCRETE=1
-SOURCES_C += $(CORE_DIR)/src/sound/discrete.c
-endif
-
 SOUND=$(strip $(findstring DAC@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_DAC=1
@@ -946,12 +934,6 @@ CPUDEFS += -DHAS_HD63701=1
 HAS_M68K_COMMON=1
 endif
 
-CPU=$(strip $(findstring NSC8105@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_NSC8105=1
-HAS_M68K_COMMON=1
-endif
-
 ifeq ($(HAS_M68K_COMMON),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m6800/m6800.c
 endif
@@ -1025,19 +1007,6 @@ CPU=$(strip $(findstring Z8000@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_Z8000=1
 SOURCES_C += $(CORE_DIR)/src/cpu/z8000/z8000.c
-endif
-
-CPU=$(strip $(findstring CCPU@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_CCPU=1
-SOURCES_C += $(CORE_DIR)/src/cpu/ccpu/ccpu.c \
-				 $(CORE_DIR)/src/vidhrdw/cinemat.c
-endif
-
-CPU=$(strip $(findstring MIPS@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_MIPS=1
-SOURCES_C += $(CORE_DIR)/src/cpu/mips/mips.c
 endif
 
 CPU=$(strip $(findstring SC61860@,$(CPUS)))
