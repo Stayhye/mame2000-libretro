@@ -70,11 +70,8 @@ SOUNDS+=YM2151_ALT@
 SOUNDS+=YM2608@
 SOUNDS+=YM2610@
 SOUNDS+=YM2610B@
-#SOUNDS+=YM2612@
-#SOUNDS+=YM3438@
 SOUNDS+=YM2413@
 SOUNDS+=YM3812@
-#SOUNDS+=YMZ280B@
 SOUNDS+=YM3526@
 SOUNDS+=Y8950@
 #SOUNDS+=SN76477@
@@ -642,12 +639,6 @@ endif
 ifneq ($(strip $(findstring YM2610B@,$(SOUNDS))),)
 HAS_AY8910=1
 endif
-ifneq ($(strip $(findstring YM2612@,$(SOUNDS))),)
-HAS_AY8910=1
-endif
-ifneq ($(strip $(findstring YM3438@,$(SOUNDS))),)
-HAS_AY8910=1
-endif
 
 ifeq ($(HAS_AY8910),1)
 SOURCES_C += $(CORE_DIR)/src/sound/ay8910.c
@@ -694,20 +685,6 @@ ifeq ($(HAS_YM2610_INTF),1)
 SOURCES_C += $(CORE_DIR)/src/sound/2610intf.c
 endif
 
-ifneq ($(strip $(findstring YM2612@,$(SOUNDS))),)
-SOUNDDEFS += -DHAS_YM2612=1
-HAS_YM2612=1
-endif
-
-ifneq ($(strip $(findstring YM3438@,$(SOUNDS))),)
-SOUNDDEFS += -DHAS_YM3438=1
-HAS_YM2612=1
-endif
-
-ifeq ($(HAS_YM2612),1)
-SOURCES_C += $(CORE_DIR)/src/sound/2612intf.c
-endif
-
 # add FM and YMDELTAT
 ifneq ($(strip $(findstring YM2203@,$(SOUNDS))),)
 HAS_FM=1
@@ -718,14 +695,6 @@ HAS_FM=1
 endif
 
 ifneq ($(strip $(findstring YM2151_ALT@,$(SOUNDS))),)
-HAS_FM=1
-endif
-
-ifneq ($(strip $(findstring YM2612@,$(SOUNDS))),)
-HAS_FM=1
-endif
-
-ifneq ($(strip $(findstring YM3438@,$(SOUNDS))),)
 HAS_FM=1
 endif
 
