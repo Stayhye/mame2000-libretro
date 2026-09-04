@@ -30,6 +30,24 @@ char slash = '\\';
 char slash = '/';
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void retro_init(void) { /* ... */ }
+void retro_deinit(void) { /* ... */ }
+unsigned retro_api_version(void) { return RETRO_API_VERSION; }
+void retro_get_system_info(struct retro_system_info *info) { /* ... */ }
+void retro_get_system_av_info(struct retro_system_av_info *info) { /* ... */ }
+bool retro_load_game(const struct retro_game_info *info) { return true; }
+void retro_unload_game(void) {}
+void retro_run(void) {}
+// ... and all other required libretro symbols
+
+#ifdef __cplusplus
+}
+#endif
+
 char *IMAMEBASEPATH = NULL;
 char *IMAMESAMPLEPATH = NULL;
 
