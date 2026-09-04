@@ -15,8 +15,8 @@ CPUS+=8080@
 CPUS+=M6502@
 CPUS+=M6510@
 CPUS+=M6800@
-CPUS+=M6801@
-CPUS+=M6802@
+#CPUS+=M6801@
+#CPUS+=M6802@
 CPUS+=M6803@
 CPUS+=M6808@
 CPUS+=M6805@
@@ -172,94 +172,12 @@ SOURCES_C += $(CORE_DIR)/src/vidhrdw/konamiic.c
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/bosco.c
 
-#SOURCES_C += $(CORE_DIR)/src/drivers/galaga.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/digdug.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/xevious.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/superpac.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/phozon.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/mappy.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/grobda.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/gaplus.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/toypop.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/polepos.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/pacland.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/skykid.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/baraduke.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/namcos86.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/namcos1.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/namcos2.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/cosmic.c \
-				 $(CORE_DIR)/src/drivers/cheekyms.c \
-				 $(CORE_DIR)/src/drivers/ladybug.c \
-				 $(CORE_DIR)/src/drivers/mrdo.c \
-				 $(CORE_DIR)/src/drivers/docastle.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/dkong.c \
-				 $(CORE_DIR)/src/drivers/mario.c \
-				 $(CORE_DIR)/src/drivers/popeye.c \
-				 $(CORE_DIR)/src/drivers/punchout.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/8080bw.c \
-				 $(CORE_DIR)/src/drivers/m79amb.c
-
 SOURCES_C += $(CORE_DIR)/src/drivers/z80bw.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/lazercmd.c \
-				 $(CORE_DIR)/src/drivers/meadows.c \
-				 $(CORE_DIR)/src/drivers/astrocde.c
 
 SOURCES_C += $(CORE_DIR)/src/machine/konami.c 
 				
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/skychut.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/mpatrol.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/troangel.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/yard.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/travrusa.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/m62.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/vigilant.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/m72.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/shisen.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/m92.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/m107.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/gottlieb.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/crbaloon.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/qix.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/taitosj.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/bking2.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/gsword.c
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/retofinv.c
 
@@ -528,55 +446,9 @@ SOURCES_C += $(CORE_DIR)/src/drivers/simpsons.c
 
 #SOURCES_C += $(CORE_DIR)/src/drivers/vendetta.c
 
-#SOURCES_C += $(CORE_DIR)/src/drivers/twin16.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/gradius3.c
-
 SOURCES_C += $(CORE_DIR)/src/drivers/tmnt.c
 
 SOURCES_C += $(CORE_DIR)/src/drivers/xmen.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/psychic5.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/ginganin.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/megasys1.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/cischeat.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/skyfox.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/argus.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/momoko.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/rpunch.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/tail2nos.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/pipedrm.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/aerofgt.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/psikyo.c
-
-#SOURCES_C += $(CORE_DIR)/src/machine/8254pit.c \
-				 $(CORE_DIR)/src/drivers/leland.c \
-				 $(CORE_DIR)/src/drivers/ataxx.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/marineb.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/funkybee.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/zodiack.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/espial.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/vastar.c
-
-#SOURCES_C += $(CORE_DIR)/src/drivers/gaelco.c \
-				 $(CORE_DIR)/src/drivers/splash.c
-
 
 SOURCES_C += $(CORE_DIR)/src/driver.c
 
