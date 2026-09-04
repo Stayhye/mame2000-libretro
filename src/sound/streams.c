@@ -313,7 +313,7 @@ void stream_update(int channel,int min_interval)
 
             profiler_mark(PROFILER_SOUND);
             (*stream_callback[channel])(stream_param[channel],buf,buflen);
-          <i>profiler_mark(PROFILER_END);
+            profiler_mark(PROFILER_END);
 
             stream_buffer_pos[channel] += buflen;
         }
