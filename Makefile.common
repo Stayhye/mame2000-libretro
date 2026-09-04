@@ -83,9 +83,7 @@ SOUNDS+=YM3812@
 SOUNDS+=YMZ280B@
 SOUNDS+=YM3526@
 SOUNDS+=Y8950@
-SOUNDS+=SN76477@
-#SOUNDS+=SN76496@
-#SOUNDS+=POKEY@
+#SOUNDS+=SN76477@
 #SOUNDS+=TIA@
 #SOUNDS+=NES@
 SOUNDS+=ASTROCADE@
@@ -821,12 +819,6 @@ SOUND=$(strip $(findstring QSOUND@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_QSOUND=1
 SOURCES_C += $(CORE_DIR)/src/sound/qsound.c
-endif
-
-SOUND=$(strip $(findstring SN76477@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_SN76477=1
-SOURCES_C += $(CORE_DIR)/src/sound/sn76477.c
 endif
 
 SOUND=$(strip $(findstring TMS5220@,$(SOUNDS)))
