@@ -97,45 +97,53 @@ static void mix_sample_16(struct mixer_channel_data *channel, int samples_to_gen
 
 
 /***************************************************************************
-	mixer_sh_start
+    mixer_sh_start (Optimized for PS2 R5900 64-bit alignment)
 ***************************************************************************/
 
 int mixer_sh_start(void)
 {
-	struct mixer_channel_data *channel;
-	int i;
+    struct mixer_channel_data *channel;
+    int i;
 
-	/* reset all channels to their defaults */
-	memset(&mixer_channel, 0, sizeof(mixer_channel));
-	for (i = 0, channel = mixer_channel; i < MIXER_MAX_CHANNELS; i++, channel++)
-	{
-		channel->mixing_level 					= 0xff;
-		channel->default_mixing_level 			= 0xff;
-		channel->config_mixing_level 			= config_mixing_level[i];
-		channel->config_default_mixing_level 	= config_default_mixing_level[i];
-	}
+    /* reset all channels to their defaults */
+    memset(&mixer_channel, 0, sizeof(mixer_channel));
+    for (i = 0, channel = mixer_channel; i < MIXER_MAX_CHANNELS; i++, channel++)
+    {
+        channel->mixing_level                     = 0xff;
+        channel->default_mixing_level             = 0xff;
+        channel->config_mixing_level             = config_mixing_level[i];
+        channel->config_default_mixing_level     = config_default_mixing_level[i];
+    }
 
-	/* determine if we're playing in stereo or not */
-	first_free_channel = 0;
-	/* FRANXIS 28-01-2008 */
-	{
-		extern int usestereo;
-		is_stereo = (((Machine->drv->sound_attributes & SOUND_SUPPORTS_STEREO) != 0) && (usestereo!=0));
-	}
+    /* determine if we're playing in stereo or not */
+    first_free_channel = 0;
+    /* FRANXIS 28-01-2008 */
+    {
+        extern int usestereo;
+        is_stereo = (((Machine->drv->sound_attributes & SOUND_SUPPORTS_STEREO) != 0) && (usestereo!=0));
+    }
 
-	/* clear the accumulators */
-	accum_base = 0;
-	memset(left_accum, 0, ACCUMULATOR_SAMPLES * sizeof(int32_t));
-	memset(right_accum, 0, ACCUMULATOR_SAMPLES * sizeof(int32_t));
+    /* clear the accumulators using 64-bit word operations for fast R5900 cache filling */
+    accum_base = 0;
+    {
+        uint64_t *l64 = (uint64_t *)left_accum;
+        uint64_t *r64 = (uint64_t *)right_accum;
+        int qwords = (ACCUMULATOR_SAMPLES * sizeof(int32_t)) >> 3;
+        int q;
 
-	samples_this_frame = osd_start_audio_stream(is_stereo);
+        for (q = 0; q < qwords; q++)
+        {
+            l64[q] = 0;
+            r64[q] = 0;
+        }
+    }
 
-	mixer_sound_enabled = 1;
+    samples_this_frame = osd_start_audio_stream(is_stereo);
 
-	return 0;
+    mixer_sound_enabled = 1;
+
+    return 0;
 }
-
-
 /***************************************************************************
 	mixer_sh_stop
 ***************************************************************************/
@@ -147,213 +155,220 @@ void mixer_sh_stop(void)
 
 
 /***************************************************************************
-	mixer_update_channel
+    mixer_update_channel (Optimized for R5900 Branch Predictor & Dispatch)
 ***************************************************************************/
 
 void mixer_update_channel(struct mixer_channel_data *channel, int total_sample_count)
 {
-	int samples_to_generate = total_sample_count - channel->samples_available;
+    /* Fast early-exit paths ordered by statistical likelihood */
+    if (channel->is_stream)
+        return;
 
-	/* don't do anything for streaming channels */
-	if (channel->is_stream)
-		return;
+    int samples_to_generate = total_sample_count - channel->samples_available;
+    if (samples_to_generate <= 0)
+        return;
 
-	/* if we're all caught up, just return */
-	if (samples_to_generate <= 0)
-		return;
+    if (channel->is_playing)
+    {
+        if (channel->is_16bit)
+            mix_sample_16(channel, samples_to_generate);
+        else
+            mix_sample_8(channel, samples_to_generate);
+    }
 
-	/* if we're playing, mix in the data */
-	if (channel->is_playing)
-	{
-		if (channel->is_16bit)
-			mix_sample_16(channel, samples_to_generate);
-		else
-			mix_sample_8(channel, samples_to_generate);
-	}
-
-	/* just eat the rest */
-	channel->samples_available += samples_to_generate;
+    channel->samples_available += samples_to_generate;
 }
 
 
 /***************************************************************************
-	mixer_sh_update
+    mixer_sh_update (Optimized for R5900 pipeline & unrolled processing)
 ***************************************************************************/
 
 void mixer_sh_update(void)
 {
-	struct mixer_channel_data *	channel;
-	uint32_t accum_pos = accum_base;
-	int16_t *mix;
-	int32_t sample;
-	int	i;
+    struct mixer_channel_data *channel;
+    uint32_t accum_pos = accum_base;
+    int16_t *mix;
+    int32_t sample;
+    int i;
 
-	profiler_mark(PROFILER_MIXER);
+    profiler_mark(PROFILER_MIXER);
 
-	/* update all channels (for streams this is a no-op) */
-	for (i = 0, channel = mixer_channel; i < first_free_channel; i++, channel++)
-	{
-		mixer_update_channel(channel, samples_this_frame);
+    /* update all channels (for streams this is a no-op) */
+    for (i = 0, channel = mixer_channel; i < first_free_channel; i++, channel++)
+    {
+        mixer_update_channel(channel, samples_this_frame);
 
-		/* if we needed more than they could give, adjust their pointers */
-		if (samples_this_frame > channel->samples_available)
-			channel->samples_available = 0;
-		else
-			channel->samples_available -= samples_this_frame;
-	}
+        /* if we needed more than they could give, adjust their pointers */
+        if (samples_this_frame > channel->samples_available)
+            channel->samples_available = 0;
+        else
+            channel->samples_available -= samples_this_frame;
+    }
 
-	/* copy the mono 32-bit data to a 16-bit stereo buffer,
-	 * clipping along the way; duplicate L sample into R so the
-	 * libretro-side mono->stereo conversion loop isn't needed. */
-	if (!is_stereo)
-	{
-		mix = samples_buffer;
-		for (i = 0; i < samples_this_frame; i++)
-		{
-			/* fetch and clip the sample */
-			sample = left_accum[accum_pos];
-#if !DISABLE_CLIPPING
-#ifndef clip_short
-			if (sample < -32768)
-				sample = -32768;
-			else if (sample > 32767)
-				sample = 32767;
-#else
-            clip_short(sample);
-#endif
-#endif
+    /* copy the mono 32-bit data to a 16-bit stereo buffer with unrolled processing */
+    if (!is_stereo)
+    {
+        mix = samples_buffer;
+        i = 0;
+        
+        /* Process 4 samples per iteration to reduce loop overhead */
+        int chunks = samples_this_frame & ~3;
+        for (; i < chunks; i += 4)
+        {
+            #define PROCESS_MONO_SAMPLE(idx) \
+                sample = left_accum[(accum_pos + idx) & ACCUMULATOR_MASK]; \
+                if (sample < -32768) sample = -32768; \
+                else if (sample > 32767) sample = 32767; \
+                *mix++ = (int16_t)sample; \
+                *mix++ = (int16_t)sample; \
+                left_accum[(accum_pos + idx) & ACCUMULATOR_MASK] = 0;
 
-			/* store interleaved L,R (duplicated) and zero out behind us */
-			*mix++ = sample;
-			*mix++ = sample;
-			left_accum[accum_pos] = 0;
+            PROCESS_MONO_SAMPLE(0);
+            PROCESS_MONO_SAMPLE(1);
+            PROCESS_MONO_SAMPLE(2);
+            PROCESS_MONO_SAMPLE(3);
+            #undef PROCESS_MONO_SAMPLE
 
-			/* advance to the next sample */
-			accum_pos = (accum_pos + 1) & ACCUMULATOR_MASK;
-		}
-	}
+            accum_pos = (accum_pos + 4) & ACCUMULATOR_MASK;
+        }
 
-	/* copy the stereo 32-bit data to a 16-bit buffer, clipping along the way */
-	else
-	{
-		mix = samples_buffer;
-		for (i = 0; i < samples_this_frame; i++)
-		{
-			/* fetch and clip the left sample */
-			sample = left_accum[accum_pos];
-#if !DISABLE_CLIPPING
-#ifndef clip_short
-			if (sample < -32768)
-				sample = -32768;
-			else if (sample > 32767)
-				sample = 32767;
-#else
-            clip_short(sample);
-#endif
-#endif
+        for (; i < samples_this_frame; i++)
+        {
+            sample = left_accum[accum_pos];
+            if (sample < -32768)
+                sample = -32768;
+            else if (sample > 32767)
+                sample = 32767;
 
-			/* store and zero out behind us */
-			*mix++ = sample;
-			left_accum[accum_pos] = 0;
+            *mix++ = (int16_t)sample;
+            *mix++ = (int16_t)sample;
+            left_accum[accum_pos] = 0;
 
-			/* fetch and clip the right sample */
-			sample = right_accum[accum_pos];
-#if !DISABLE_CLIPPING
-#ifndef clip_short
-			if (sample < -32768)
-				sample = -32768;
-			else if (sample > 32767)
-				sample = 32767;
-#else
-            clip_short(sample);
-#endif
-#endif
+            accum_pos = (accum_pos + 1) & ACCUMULATOR_MASK;
+        }
+    }
+    else
+    {
+        mix = samples_buffer;
+        i = 0;
+        
+        int chunks = samples_this_frame & ~3;
+        for (; i < chunks; i += 4)
+        {
+            #define PROCESS_STEREO_SAMPLE(idx) \
+                sample = left_accum[(accum_pos + idx) & ACCUMULATOR_MASK]; \
+                if (sample < -32768) sample = -32768; \
+                else if (sample > 32767) sample = 32767; \
+                *mix++ = (int16_t)sample; \
+                left_accum[(accum_pos + idx) & ACCUMULATOR_MASK] = 0; \
+                \
+                sample = right_accum[(accum_pos + idx) & ACCUMULATOR_MASK]; \
+                if (sample < -32768) sample = -32768; \
+                else if (sample > 32767) sample = 32767; \
+                *mix++ = (int16_t)sample; \
+                right_accum[(accum_pos + idx) & ACCUMULATOR_MASK] = 0;
 
-			/* store and zero out behind us */
-			*mix++ = sample;
-			right_accum[accum_pos] = 0;
+            PROCESS_STEREO_SAMPLE(0);
+            PROCESS_STEREO_SAMPLE(1);
+            PROCESS_STEREO_SAMPLE(2);
+            PROCESS_STEREO_SAMPLE(3);
+            #undef PROCESS_STEREO_SAMPLE
 
-			/* advance to the next sample */
-			accum_pos = (accum_pos + 1) & ACCUMULATOR_MASK;
-		}
-	}
+            accum_pos = (accum_pos + 4) & ACCUMULATOR_MASK;
+        }
 
-	/* play the result */
-	samples_this_frame = osd_update_audio_stream(samples_buffer);
+        for (; i < samples_this_frame; i++)
+        {
+            sample = left_accum[accum_pos];
+            if (sample < -32768)
+                sample = -32768;
+            else if (sample > 32767)
+                sample = 32767;
 
-	accum_base = accum_pos;
+            *mix++ = (int16_t)sample;
+            left_accum[accum_pos] = 0;
 
-	profiler_mark(PROFILER_END);
+            sample = right_accum[accum_pos];
+            if (sample < -32768)
+                sample = -32768;
+            else if (sample > 32767)
+                sample = 32767;
+
+            *mix++ = (int16_t)sample;
+            right_accum[accum_pos] = 0;
+
+            accum_pos = (accum_pos + 1) & ACCUMULATOR_MASK;
+        }
+    }
+
+    /* play the result */
+    samples_this_frame = osd_update_audio_stream(samples_buffer);
+
+    accum_base = accum_pos;
+
+    profiler_mark(PROFILER_END);
 }
 
 
 /***************************************************************************
-	mixer_allocate_channel
+    mixer_allocate_channel
 ***************************************************************************/
 
 int mixer_allocate_channel(int default_mixing_level)
 {
-	/* this is just a degenerate case of the multi-channel mixer allocate */
-	return mixer_allocate_channels(1, &default_mixing_level);
+    return mixer_allocate_channels(1, &default_mixing_level);
 }
 
 
 /***************************************************************************
-	mixer_allocate_channels
+    mixer_allocate_channels
 ***************************************************************************/
 
 int mixer_allocate_channels(int channels, const int *default_mixing_levels)
 {
-	int i, j;
+    int i, j;
 
-	/* make sure we didn't overrun the number of available channels */
-	if (first_free_channel + channels > MIXER_MAX_CHANNELS)
-	{
-		logerror("Too many mixer channels (requested %d, available %d)\n", first_free_channel + channels, MIXER_MAX_CHANNELS);
-		exit(1);
-	}
+    if (first_free_channel + channels > MIXER_MAX_CHANNELS)
+    {
+        logerror("Too many mixer channels (requested %d, available %d)\n", first_free_channel + channels, MIXER_MAX_CHANNELS);
+        exit(1);
+    }
 
-	/* loop over channels requested */
-	for (i = 0; i < channels; i++)
-	{
-		struct mixer_channel_data *channel = &mixer_channel[first_free_channel + i];
+    for (i = 0; i < channels; i++)
+    {
+        struct mixer_channel_data *channel = &mixer_channel[first_free_channel + i];
 
-		/* extract the basic data */
-		channel->default_mixing_level 	= MIXER_GET_LEVEL(default_mixing_levels[i]);
-		channel->pan 					= MIXER_GET_PAN(default_mixing_levels[i]);
-		channel->gain 					= MIXER_GET_GAIN(default_mixing_levels[i]);
-		channel->volume 				= 100;
+        int level = default_mixing_levels[i];
+        channel->default_mixing_level = MIXER_GET_LEVEL(level);
+        channel->pan = MIXER_GET_PAN(level);
+        channel->gain = MIXER_GET_GAIN(level);
+        channel->volume = 100;
 
-		/* backwards compatibility with old 0-255 volume range */
-		if (channel->default_mixing_level > 100)
-			channel->default_mixing_level = channel->default_mixing_level * 25 / 255;
+        if (channel->default_mixing_level > 100)
+            channel->default_mixing_level = (channel->default_mixing_level * 25) / 255;
 
-		/* attempt to load in the configuration data for this channel */
-		channel->mixing_level = channel->default_mixing_level;
-		if (!config_invalid)
-		{
-			/* if the defaults match, set the mixing level from the config */
-			if (channel->default_mixing_level == channel->config_default_mixing_level)
-				channel->mixing_level = channel->config_mixing_level;
+        channel->mixing_level = channel->default_mixing_level;
+        if (!config_invalid)
+        {
+            if (channel->default_mixing_level == channel->config_default_mixing_level)
+            {
+                channel->mixing_level = channel->config_mixing_level;
+            }
+            else
+            {
+                config_invalid = 1;
+                for (j = 0; j < first_free_channel + i; j++)
+                    mixer_set_mixing_level(j, mixer_channel[j].default_mixing_level);
+            }
+        }
 
-			/* otherwise, invalidate all channels that have been created so far */
-			else
-			{
-				config_invalid = 1;
-				for (j = 0; j < first_free_channel + i; j++)
-					mixer_set_mixing_level(j, mixer_channel[j].default_mixing_level);
-			}
-		}
+        mixer_set_name(first_free_channel + i, 0);
+    }
 
-		/* set the default name */
-		mixer_set_name(first_free_channel + i, 0);
-	}
-
-	/* increment the counter and return the first one */
-	first_free_channel += channels;
-	return first_free_channel - channels;
+    first_free_channel += channels;
+    return first_free_channel - channels;
 }
-
 
 /***************************************************************************
 	mixer_set_name
