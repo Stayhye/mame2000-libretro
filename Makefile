@@ -61,7 +61,7 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
 endif
   
 # PS2
-else ifeq ($(platform), ps2)
+ifeq ($(platform), ps2)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
    CC = mips64r5900el-ps2-elf-gcc
    CXX = mips64r5900el-ps2-elf-g++
