@@ -21,7 +21,6 @@ CPUS+=M6803@
 CPUS+=M6808@
 CPUS+=M6805@
 CPUS+=M68705@
-#CPUS+=HD6309@
 CPUS+=M6809@
 CPUS+=KONAMI@
 CPUS+=M68000@
@@ -35,7 +34,6 @@ CPUS+=Z8000@
 # uncomment the following lines to include a sound core
 SOUNDS+=CUSTOM@
 SOUNDS+=SAMPLES@
-#SOUNDS+=DAC@
 #SOUNDS+=AY8910@
 SOUNDS+=YM2203@
 # enable only one of the following two
@@ -589,9 +587,6 @@ SOURCES_C += $(CORE_DIR)/src/driver.c
 # --------------
 
 # add AY8910
-ifneq ($(strip $(findstring AY8910@,$(SOUNDS))),)
-HAS_AY8910=1
-endif
 ifneq ($(strip $(findstring YM2203@,$(SOUNDS))),)
 HAS_AY8910=1
 endif
@@ -728,12 +723,6 @@ SOUND=$(strip $(findstring SEGAPCM@,$(SOUNDS)))
 ifneq ($(SOUND),)
 SOUNDDEFS += -DHAS_SEGAPCM=1
 SOURCES_C += $(CORE_DIR)/src/sound/segapcm.c
-endif
-
-SOUND=$(strip $(findstring DAC@,$(SOUNDS)))
-ifneq ($(SOUND),)
-SOUNDDEFS += -DHAS_DAC=1
-SOURCES_C += $(CORE_DIR)/src/sound/dac.c
 endif
 
 SOUND=$(strip $(findstring ADPCM@,$(SOUNDS)))
