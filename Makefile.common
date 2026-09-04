@@ -12,7 +12,7 @@ INCFLAGS    := -I$(CORE_DIR)/src -I$(CORE_DIR)/src/libretro -I$(LIBRETRO_COMM_DI
 CPUS+=Z80@
 #CPUS+=Z80GB@
 CPUS+=8080@
-CPUS+=8085A@
+#CPUS+=8085A@
 CPUS+=M6502@
 CPUS+=M65C02@
 #CPUS+=M65SC02@
@@ -1298,12 +1298,6 @@ endif
 CPU=$(strip $(findstring 8080@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_8080=1
-HAS_I8085=1
-endif
-
-CPU=$(strip $(findstring 8085A@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_8085A=1
 HAS_I8085=1
 endif
 
