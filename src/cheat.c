@@ -1,5 +1,6 @@
-#emulate/stub for cheat functions
-void cheat_init(void) {}
-void cheat_shutdown(void) {}
-void cheat_update(void) {}
-int cheat_enabled(void) { return 0; }
+void StopCheat(void) {}
+void InitCheat(void) {}
+int he_did_cheat = 0;
+void DoCheat(void) {}
+void cheat_menu(void) {}
+char *cheatfile = NULL;
