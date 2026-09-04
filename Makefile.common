@@ -14,14 +14,6 @@ CPUS+=Z80@
 CPUS+=8080@
 CPUS+=M6502@
 CPUS+=M6510@
-#CPUS+=I86@
-#CPUS+=I88@
-#CPUS+=I186@
-#CPUS+=I188@
-#CPUS+=I288@
-#CPUS+=V20@
-#CPUS+=I8039@
-#CPUS+=N7751@
 CPUS+=M6800@
 CPUS+=M6801@
 CPUS+=M6802@
@@ -31,7 +23,6 @@ CPUS+=M6808@
 #CPUS+=NSC8105@
 CPUS+=M6805@
 CPUS+=M68705@
-#CPUS+=HD63705@
 #CPUS+=HD6309@
 CPUS+=M6809@
 CPUS+=KONAMI@
@@ -936,30 +927,6 @@ ifeq ($(HAS_M6502),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m6502/m6502.c
 endif
 
-CPU=$(strip $(findstring I86@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I86=1
-HAS_I86=1
-endif
-
-CPU=$(strip $(findstring I88@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I88=1
-HAS_I86=1
-endif
-
-CPU=$(strip $(findstring I186@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I186=1
-HAS_I86=1
-endif
-
-CPU=$(strip $(findstring I188@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_I188=1
-HAS_I86=1
-endif
-
 CPU=$(strip $(findstring I286@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_I286=1
@@ -1029,13 +996,6 @@ endif
 CPU=$(strip $(findstring M68705@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_M68705=1
-endif
-
-CPU=$(strip $(findstring HD63705@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_HD63705=1
-CPUDEFS += -DHAS_M6805=1
-HAS_M6805=1
 endif
 
 ifeq ($(HAS_M6805),1)
