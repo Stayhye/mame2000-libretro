@@ -15,9 +15,7 @@ CPUS+=8080@
 CPUS+=M6502@
 #CPUS+=M6509@
 CPUS+=M6510@
-#CPUS+=M6510T@
 #CPUS+=M7501@
-#CPUS+=M8502@
 #CPUS+=M4510@
 #CPUS+=N2A03@
 #CPUS+=H6280@
@@ -991,12 +989,6 @@ endif
 CPU=$(strip $(findstring M6510@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_M6510=1
-HAS_M6502=1
-endif
-
-CPU=$(strip $(findstring M8502@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_M6510=1 -DHAS_M8502=1
 HAS_M6502=1
 endif
 
