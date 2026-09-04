@@ -23,7 +23,7 @@ CPUS+=M6510@
 #CPUS+=M7501@
 #CPUS+=M8502@
 #CPUS+=M4510@
-CPUS+=N2A03@
+#CPUS+=N2A03@
 #CPUS+=H6280@
 CPUS+=I86@
 #CPUS+=I88@
@@ -46,8 +46,8 @@ CPUS+=HD63701@
 CPUS+=NSC8105@
 CPUS+=M6805@
 CPUS+=M68705@
-CPUS+=HD63705@
-CPUS+=HD6309@
+#CPUS+=HD63705@
+#CPUS+=HD6309@
 CPUS+=M6809@
 CPUS+=KONAMI@
 CPUS+=M68000@
@@ -1351,12 +1351,6 @@ ifeq ($(HAS_M6502),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m6502/m6502.c
 endif
 
-CPU=$(strip $(findstring N2A03@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_N2A03=1
-HAS_M6502=1
-endif
-
 CPU=$(strip $(findstring I86@,$(CPUS)))
 ifneq ($(CPU),)
 CPUDEFS += -DHAS_I86=1
@@ -1473,12 +1467,6 @@ endif
 
 ifeq ($(HAS_M6805),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/m6805/m6805.c
-endif
-
-CPU=$(strip $(findstring HD6309@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_HD6309=1
-HAS_M6809=1
 endif
 
 CPU=$(strip $(findstring M6809@,$(CPUS)))
