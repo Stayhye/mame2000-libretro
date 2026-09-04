@@ -787,7 +787,6 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_run(void)
 {
-
    /* Software-framebuffer fast path.
     *
     * Before the emulator runs the next frame, ask the frontend for a
@@ -809,18 +808,18 @@ void retro_run(void)
    if (gfx_width > 0 && gfx_height > 0 && gp2x_screen15_owned != NULL)
    {
       struct retro_framebuffer fb;
-      fb.data         = NULL;
-      fb.width        = gfx_width;
-      fb.height       = gfx_height;
-      fb.pitch        = 0;
-      fb.format       = RETRO_PIXEL_FORMAT_RGB565;
+      fb.data             = NULL;
+      fb.width            = gfx_width;
+      fb.height           = gfx_height;
+      fb.pitch            = 0;
+      fb.format           = RETRO_PIXEL_FORMAT_RGB565;
       fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
       fb.memory_flags = 0;
 
       if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
-          && fb.data != NULL
-          && fb.format == RETRO_PIXEL_FORMAT_RGB565
-          && fb.pitch  == (size_t)gfx_width * 2)
+         && fb.data != NULL
+         && fb.format == RETRO_PIXEL_FORMAT_RGB565
+         && fb.pitch  == (size_t)gfx_width * 2)
       {
          sw_fb_active_data  = fb.data;
          sw_fb_active_pitch = fb.pitch;
@@ -855,17 +854,69 @@ void retro_run(void)
    mame_run_one_frame();
 
    if (should_skip_frame || skip_this_frame)
+   {
       video_cb(NULL, gfx_width, gfx_height, gfx_width * 2);
-   else if (mame2000_direct_frame_data != 0)
-      /* Bitmap-direct fast path: the just-finished frame skipped the
-       * blit and recorded the MAME scrbitmap pointer for us to deliver.
-       * The bitmap stride is wider than the visible width (osd_alloc_-
-       * bitmap pads each row with safety pixels and rounds the width
-       * up to a quadword); video_cb accepts the stride as the pitch. */
-      video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
-               mame2000_direct_frame_pitch);
-   else
-      video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
+   }
+   else 
+   {
+      // 64-bit wide register block copy path for PS2 EE optimization
+      const void *src_frame = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_data : gp2x_screen15;
+      size_t src_pitch = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_pitch : (gfx_width * 2);
+      
+      if (sw_fb_active_data != NULL && sw_fb_active_pitch == src_pitch)
+      {
+         const uint8_t *s_row = (const uint8_t *)src_frame;
+         uint8_t *d_row       = (uint8_t *)sw_fb_active_data;
+         int row_bytes        = gfx_width * 2;
+         
+         int chunks = row_bytes >> 3;
+         int rem    = row_bytes & 7;
+
+         for (int y = 0; y < gfx_height; y++)
+         {
+            const uint64_t *s64 = (const uint64_t *)s_row;
+            uint64_t *d64       = (uint64_t *)d_row;
+
+            int i = 0;
+            for (; i <= chunks - 4; i += 4)
+            {
+               d64[i]     = s64[i];
+               d64[i + 1] = s64[i + 1];
+               d64[i + 2] = s64[i + 2];
+               d64[i + 3] = s64[i + 3];
+            }
+            for (; i < chunks; i++)
+            {
+               d64[i] = s64[i];
+            }
+
+            if (rem)
+            {
+               const uint8_t *s8 = s_row;
+               uint8_t *d8       = d_row;
+               int offset        = chunks << 3;
+               for (int b = 0; b < rem; b++)
+               {
+                  d8[offset + b] = s8[offset + b];
+               }
+            }
+
+            s_row += src_pitch;
+            d_row += sw_fb_active_pitch;
+         }
+
+         video_cb(sw_fb_active_data, gfx_width, gfx_height, sw_fb_active_pitch);
+      }
+      else if (mame2000_direct_frame_data != 0)
+      {
+         video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
+                  mame2000_direct_frame_pitch);
+      }
+      else
+      {
+         video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
+      }
+   }
 
    /* Restore the core-owned buffer for the next frame so allocation
     * lifetimes stay sane regardless of whether the frontend grants a
@@ -904,8 +955,8 @@ void retro_run(void)
    /* If frameskip/timing settings have changed,
     * update frontend audio latency
     * > Can do this before or after the frameskip
-    *    check, but doing it after means we at least
-    *    retain the current frame's audio output */
+    *   check, but doing it after means we at least
+    *   retain the current frame's audio output */
    if (update_audio_latency)
    {
       environ_cb(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
