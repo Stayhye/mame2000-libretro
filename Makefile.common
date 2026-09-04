@@ -25,19 +25,15 @@ CPUS+=M6510@
 #CPUS+=I188@
 #CPUS+=I288@
 #CPUS+=V20@
-#CPUS+=V30@
-#CPUS+=V33@
-#CPUS+=I8035@
 #CPUS+=I8039@
-#CPUS+=I8048@
 #CPUS+=N7751@
 CPUS+=M6800@
 CPUS+=M6801@
 CPUS+=M6802@
 CPUS+=M6803@
 CPUS+=M6808@
-CPUS+=HD63701@
-CPUS+=NSC8105@
+#CPUS+=HD63701@
+#CPUS+=NSC8105@
 CPUS+=M6805@
 CPUS+=M68705@
 #CPUS+=HD63705@
@@ -983,18 +979,6 @@ endif
 
 ifeq ($(HAS_I86),1)
 SOURCES_C += $(CORE_DIR)/src/cpu/i86/i86.c
-endif
-
-CPU=$(strip $(findstring V30@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_V30=1
-HAS_NEC=1
-endif
-
-CPU=$(strip $(findstring V33@,$(CPUS)))
-ifneq ($(CPU),)
-CPUDEFS += -DHAS_V33=1
-HAS_NEC=1
 endif
 
 ifeq ($(HAS_NEC),1)
