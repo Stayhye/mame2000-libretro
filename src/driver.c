@@ -2024,9 +2024,9 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	//DRIVER( rollerg )	/* GX999 (c) 1991 (US) */
 	//DRIVER( rollergj )	/* GX999 (c) 1991 (Japan) */
 //TESTDRIVER( xexex )		/* GX067 (c) 1991 */
-	DRIVER( simpsons )	/* GX072 (c) 1991 */
+	//DRIVER( simpsons )	/* GX072 (c) 1991 */
 	DRIVER( simpsn2p )	/* GX072 (c) 1991 */
-	DRIVER( simps2pj )	/* GX072 (c) 1991 (Japan) */
+	//DRIVER( simps2pj )	/* GX072 (c) 1991 (Japan) */
 	//DRIVER( vendetta )	/* GX081 (c) 1991 (Asia) */
 	//DRIVER( vendett2 )	/* GX081 (c) 1991 (Asia) */
 	//DRIVER( vendettj )	/* GX081 (c) 1991 (Japan) */
@@ -2086,17 +2086,17 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	//DRIVER( tmnt2 )		/* GX063 (c) 1991 (US) */
 	//DRIVER( tmnt22p )	/* GX063 (c) 1991 (US) */
 	//DRIVER( tmnt2a )	/* GX063 (c) 1991 (Asia) */
-	DRIVER( ssriders )	/* GX064 (c) 1991 (World) */
+	//DRIVER( ssriders )	/* GX064 (c) 1991 (World) */
 	//DRIVER( ssrdrebd )	/* GX064 (c) 1991 (World) */
 	//DRIVER( ssrdrebc )	/* GX064 (c) 1991 (World) */
 	//DRIVER( ssrdruda )	/* GX064 (c) 1991 (US) */
 	//DRIVER( ssrdruac )	/* GX064 (c) 1991 (US) */
-	//DRIVER( ssrdrubc )	/* GX064 (c) 1991 (US) */
+	DRIVER( ssrdrubc )	/* GX064 (c) 1991 (US) */
 	//DRIVER( ssrdrabd )	/* GX064 (c) 1991 (Asia) */
 	//DRIVER( ssrdrjbd )	/* GX064 (c) 1991 (Japan) */
-	DRIVER( xmen )		/* GX065 (c) 1992 (US) */
+	//DRIVER( xmen )		/* GX065 (c) 1992 (US) */
 	//DRIVER( xmen6p )	/* GX065 (c) 1992 */
-	//DRIVER( xmen2pj )	/* GX065 (c) 1992 (Japan) */
+	DRIVER( xmen2pj )	/* GX065 (c) 1992 (Japan) */
 	//DRIVER( thndrx2 )	/* GX073 (c) 1991 (Japan) */
 
 /*
