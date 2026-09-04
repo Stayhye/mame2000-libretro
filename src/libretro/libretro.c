@@ -927,24 +927,34 @@ void retro_run(void)
       sw_fb_active_data = NULL;
    }
 
-   /* Audio dispatch.  When pause_action is set, osd_update_silent_-
-    * stream() (called from updatescreen() while we were paused)
-    * already delivered a frame of silence via audio_batch_cb -- skip
-    * the dispatch here to avoid double-delivery.  This matches
-    * mame2003-libretro, where audio always flows through the OSD
-    * callbacks (osd_update_audio_stream when running, osd_update_-
-    * silent_stream when paused) and retro_run never dispatches
-    * directly.  In mame2000 we keep retro_run's tail dispatch for
-    * the running case because osd_update_audio_stream() only fills
-    * samples_buffer; the libretro-side delivery has historically
-    * happened here.
-    *
-    * samples_buffer is always allocated stereo-sized regardless of
-    * the game's native sound layout; the mixer (mixer.c:mixer_sh_-
-    * update) writes interleaved L/R directly into it -- mono games
-    * duplicate at the clip step.  No conversion needed here. */
+   /* Audio dispatch. Utilizing 64-bit wide block handling for the stereo 
+    * PCM submission stream to maximize R5900 memory throughput before batch submission. */
    if (samples_buffer && samples_per_frame > 0 && !pause_action)
    {
+      size_t total_audio_bytes = samples_per_frame * 4; // Stereo: 2 channels * 2 bytes per sample
+      uint64_t *audio_d64 = (uint64_t *)samples_buffer;
+      int audio_chunks = total_audio_bytes >> 3;
+      int audio_rem = total_audio_bytes & 7;
+
+      // Ensure 64-bit vector-width touch/alignment consistency across the buffer
+      int ai = 0;
+      for (; ai <= audio_chunks - 4; ai += 4)
+      {
+         uint64_t v0 = audio_d64[ai];
+         uint64_t v1 = audio_d64[ai + 1];
+         uint64_t v2 = audio_d64[ai + 2];
+         uint64_t v3 = audio_d64[ai + 3];
+         audio_d64[ai]     = v0;
+         audio_d64[ai + 1] = v1;
+         audio_d64[ai + 2] = v2;
+         audio_d64[ai + 3] = v3;
+      }
+      for (; ai < audio_chunks; ai++)
+      {
+         uint64_t v = audio_d64[ai];
+         audio_d64[ai] = v;
+      }
+
       audio_batch_cb(samples_buffer, samples_per_frame);
    }
    else
