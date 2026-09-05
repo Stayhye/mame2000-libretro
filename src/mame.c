@@ -651,6 +651,35 @@ static int vh_open(void)
         vh_close();
         return 1;
     }
+	
+	/* create spriteram buffers safely with strict pointer validation */
+    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
+        if (spriteram_size != 0) {
+            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
+            
+            // Check for NULL or dangerous high-address returns (e.g., 0x3000xxxx)
+            if (!buffered_spriteram || ((unsigned int)buffered_spriteram & 0xF0000000)) {
+                printf("FATAL: buffered_spriteram allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram, spriteram_size);
+                vh_close(); 
+                return 1;
+            }
+            memset(buffered_spriteram, 0, spriteram_size);
+
+            if (spriteram_2_size != 0) {
+                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
+                if (!buffered_spriteram_2 || ((unsigned int)buffered_spriteram_2 & 0xF0000000)) {
+                    printf("FATAL: buffered_spriteram_2 allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram_2, spriteram_2_size);
+                    vh_close(); 
+                    return 1;
+                }
+                memset(buffered_spriteram_2, 0, spriteram_2_size);
+            }
+        } else {
+            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
+            buffered_spriteram = NULL;
+            buffered_spriteram_2 = NULL;
+        }
+    }
 
     return 0;
 }
