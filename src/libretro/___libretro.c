@@ -71,7 +71,7 @@ int update_audio_latency                 = false;
 
 int should_skip_frame                    = 0;
 
-static int sample_rate                   = 44100;
+static int sample_rate                   = 22050;
 static int stereo_enabled                = true;
 
 int game_index = -1;
@@ -243,12 +243,16 @@ static void retro_set_audio_buff_status_cb(void)
       }
       else
       {
-         // Use integer math to avoid slow floating-point division on the R5900
-         uint32_t fps = (uint32_t)Machine->drv->frames_per_second;
-         uint32_t frame_time_usec = fps ? (1000000UL / fps) : 16639UL;
+         /* Frameskip is enabled - increase frontend
+          * audio latency to minimise potential
+          * buffer underruns */
+         uint32_t frame_time_usec = 1000000.0 / Machine->drv->frames_per_second;
 
-         // Set latency to 6x current frame time, rounded up to nearest multiple of 32
-         retro_audio_latency = (unsigned)(((6 * frame_time_usec / 1000) + 0x1F) & ~0x1F);
+         /* Set latency to 6x current frame time... */
+         retro_audio_latency = (unsigned)(6 * frame_time_usec / 1000);
+
+         /* ...then round up to nearest multiple of 32 */
+         retro_audio_latency = (retro_audio_latency + 0x1F) & ~0x1F;
       }
    }
    else
@@ -458,7 +462,6 @@ void retro_reset(void)
 
 static void update_input(void)
 {
-	
 #define RK(port,key)     input_state_cb(port, RETRO_DEVICE_KEYBOARD, 0,RETROK_##key)
 #define JS(port, button) joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_##button)
 	/* Per-player digital direction bits, in the same GP2X bitmask
@@ -778,37 +781,47 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
    };
    struct retro_system_timing t = {
       Machine->drv->frames_per_second,
-      44100.0  // Force a standard sample rate here
+      (double)Machine->sample_rate
    };
-   
    info->timing = t;
    info->geometry = g;
 }
 
 void retro_run(void)
 {
-   /* Software-framebuffer fast path with strict stride validation.
-    * 
-    * Fixed to prevent graphic corruption on non-standard arcade resolutions:
-    * we verify that the frontend's pitch matches the exact line width (width * 2)
-    * before redirecting gp2x_screen15. If pitches mismatch, we fall back to a 
-    * safe copy or direct pointer to avoid out-of-bounds line wrapping. */
+   /* Software-framebuffer fast path.
+    *
+    * Before the emulator runs the next frame, ask the frontend for a
+    * buffer matching this frame's geometry and our pixel format.  If
+    * granted, point gp2x_screen15 at it for the duration of the frame:
+    * blit.c then writes directly into the frontend's memory and the
+    * video_cb call that follows is a zero-copy signal.  When no
+    * buffer is granted (or the geometry doesn't match exactly) we keep
+    * using the core-owned buffer and the existing video_cb path.
+    *
+    * Geometry must match exactly per the libretro spec: width, height
+    * and pitch as returned by the frontend, and the byte pitch must
+    * equal gfx_width * 2 because blit.c does its row arithmetic from
+    * gfx_width.  The format must be RGB565; if the frontend gives us a
+    * different one (e.g. when it would have to convert internally) we
+    * pass.  These constraints make the optimisation conservative -- a
+    * mismatched frontend just sees the existing slow path. */
    sw_fb_active_data = NULL;
    if (gfx_width > 0 && gfx_height > 0 && gp2x_screen15_owned != NULL)
    {
       struct retro_framebuffer fb;
-      fb.data             = NULL;
-      fb.width            = gfx_width;
-      fb.height           = gfx_height;
-      fb.pitch            = 0;
-      fb.format           = RETRO_PIXEL_FORMAT_RGB565;
-      fb.access_flags     = RETRO_MEMORY_ACCESS_WRITE;
-      fb.memory_flags     = 0;
+      fb.data         = NULL;
+      fb.width        = gfx_width;
+      fb.height       = gfx_height;
+      fb.pitch        = 0;
+      fb.format       = RETRO_PIXEL_FORMAT_RGB565;
+      fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+      fb.memory_flags = 0;
 
       if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
-         && fb.data != NULL
-         && fb.format == RETRO_PIXEL_FORMAT_RGB565
-         && fb.pitch  == (size_t)gfx_width * 2)
+          && fb.data != NULL
+          && fb.format == RETRO_PIXEL_FORMAT_RGB565
+          && fb.pitch  == (size_t)gfx_width * 2)
       {
          sw_fb_active_data  = fb.data;
          sw_fb_active_pitch = fb.pitch;
@@ -816,6 +829,15 @@ void retro_run(void)
       }
    }
 
+   /* Poll input + pick up frontend variable updates BEFORE running
+    * the frame, so the inputs read this turn drive THIS frame's CPU
+    * dispatch (otherwise the game would be running one frame behind
+    * the player -- mame_run_one_frame() reads from key[] / joy_-
+    * pressed[] inside osd_is_key_pressed / osd_is_joy_pressed as
+    * the CPU schedule advances, and those arrays would still hold
+    * last frame's values).  Mirrors mame2003-libretro's retro_run
+    * which puts poll_cb() and the keyboard / joypad sample loop
+    * ahead of the frame as well. */
    {
       bool updated = false;
       update_input();
@@ -823,132 +845,66 @@ void retro_run(void)
          update_variables(false);
    }
 
-   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
-   static int frame_counter = 0;
-   bool skip_this_frame = (frame_counter % 2 != 0);
-   frame_counter++;
-
+   /* Run one frame of CPU scheduling.  Returns when the timer system
+    * has fired its VBLANK update path through osd_update_video_and_-
+    * audio(), which calls hook_video_done() to raise yield_pending. */
    mame_run_one_frame();
 
-   if (should_skip_frame || skip_this_frame)
-   {
+   if (should_skip_frame)
       video_cb(NULL, gfx_width, gfx_height, gfx_width * 2);
-   }
-   else 
-   {
-      const void *src_frame = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_data : gp2x_screen15;
-      size_t src_pitch = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_pitch : (gfx_width * 2);
-      
-      // Strict stride safety check: only execute the 64-bit block transfer path 
-      // if source and destination pitches align cleanly to prevent graphic corruption.
-      if (sw_fb_active_data != NULL && sw_fb_active_pitch == src_pitch && src_pitch == (size_t)gfx_width * 2)
-      {
-         const uint8_t *s_row = (const uint8_t *)src_frame;
-         uint8_t *d_row       = (uint8_t *)sw_fb_active_data;
-         int row_bytes        = gfx_width * 2;
-         
-         int chunks = row_bytes >> 3;
-         int rem    = row_bytes & 7;
+   else if (mame2000_direct_frame_data != 0)
+      /* Bitmap-direct fast path: the just-finished frame skipped the
+       * blit and recorded the MAME scrbitmap pointer for us to deliver.
+       * The bitmap stride is wider than the visible width (osd_alloc_-
+       * bitmap pads each row with safety pixels and rounds the width
+       * up to a quadword); video_cb accepts the stride as the pitch. */
+      video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
+               mame2000_direct_frame_pitch);
+   else
+      video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
 
-         for (int y = 0; y < gfx_height; y++)
-         {
-            const uint64_t *s64 = (const uint64_t *)s_row;
-            uint64_t *d64       = (uint64_t *)d_row;
-
-            int i = 0;
-            for (; i <= chunks - 4; i += 4)
-            {
-               d64[i]     = s64[i];
-               d64[i + 1] = s64[i + 1];
-               d64[i + 2] = s64[i + 2];
-               d64[i + 3] = s64[i + 3];
-            }
-            for (; i < chunks; i++)
-            {
-               d64[i] = s64[i];
-            }
-
-            if (rem)
-            {
-               const uint8_t *s8 = s_row;
-               uint8_t *d8       = d_row;
-               int offset        = chunks << 3;
-               for (int b = 0; b < rem; b++)
-               {
-                  d8[offset + b] = s8[offset + b];
-               }
-            }
-
-            s_row += src_pitch;
-            d_row += sw_fb_active_pitch;
-         }
-
-         video_cb(sw_fb_active_data, gfx_width, gfx_height, sw_fb_active_pitch);
-      }
-      else if (mame2000_direct_frame_data != 0)
-      {
-         video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
-                  mame2000_direct_frame_pitch);
-      }
-      else
-      {
-         video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
-      }
-   }
-
+   /* Restore the core-owned buffer for the next frame so allocation
+    * lifetimes stay sane regardless of whether the frontend grants a
+    * buffer again next time. */
    if (sw_fb_active_data != NULL)
    {
       gp2x_screen15     = gp2x_screen15_owned;
       sw_fb_active_data = NULL;
    }
 
-   /* Audio dispatch optimized for PlayStation 2 EE (R5900):
-    * 
-    * Enhanced to mitigate audio popping and stuttering under heavy load:
-    * 1. Validates buffer occupancy metrics to prevent queue starvations.
-    * 2. Utilizes unrolled 64-bit quadword block copies to flush audio DMA lines cleanly.
-    * 3. Inserts a defensive check against silent/null streams before batch push. */
-   if (samples_buffer && samples_per_frame > 0 && !pause_action)
-   {
-      size_t total_audio_bytes = samples_per_frame * 4; // Stereo: 2 channels * 2 bytes per sample
-      uint64_t *audio_d64 = (uint64_t *)samples_buffer;
-      int audio_chunks = total_audio_bytes >> 3;
-      int audio_rem = total_audio_bytes & 7;
-
-      int ai = 0;
-      for (; ai <= audio_chunks - 4; ai += 4)
-      {
-         uint64_t v0 = audio_d64[ai];
-         uint64_t v1 = audio_d64[ai + 1];
-         uint64_t v2 = audio_d64[ai + 2];
-         uint64_t v3 = audio_d64[ai + 3];
-         audio_d64[ai]     = v0;
-         audio_d64[ai + 1] = v1;
-         audio_d64[ai + 2] = v2;
-         audio_d64[ai + 3] = v3;
-      }
-      for (; ai < audio_chunks; ai++)
-      {
-         uint64_t v = audio_d64[ai];
-         audio_d64[ai] = v;
-      }
-
-      // If an audio buffer underrun is signaled by the frontend driver, 
-      // pad or pace the sample batch output implicitly via standard push.
+   /* Audio dispatch.  When pause_action is set, osd_update_silent_-
+    * stream() (called from updatescreen() while we were paused)
+    * already delivered a frame of silence via audio_batch_cb -- skip
+    * the dispatch here to avoid double-delivery.  This matches
+    * mame2003-libretro, where audio always flows through the OSD
+    * callbacks (osd_update_audio_stream when running, osd_update_-
+    * silent_stream when paused) and retro_run never dispatches
+    * directly.  In mame2000 we keep retro_run's tail dispatch for
+    * the running case because osd_update_audio_stream() only fills
+    * samples_buffer; the libretro-side delivery has historically
+    * happened here.
+    *
+    * samples_buffer is always allocated stereo-sized regardless of
+    * the game's native sound layout; the mixer (mixer.c:mixer_sh_-
+    * update) writes interleaved L/R directly into it -- mono games
+    * duplicate at the clip step.  No conversion needed here. */
+   if (samples_per_frame && !pause_action)
       audio_batch_cb(samples_buffer, samples_per_frame);
-   }
-   else
-   {
-      audio_batch_cb(NULL, 0);
-   }
 
+   /* If frameskip/timing settings have changed,
+    * update frontend audio latency
+    * > Can do this before or after the frameskip
+    *   check, but doing it after means we at least
+    *   retain the current frame's audio output */
    if (update_audio_latency)
    {
       environ_cb(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
                  &retro_audio_latency);
       update_audio_latency = false;
    }
+
 }
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    struct retro_input_descriptor desc[] = {
@@ -1179,92 +1135,87 @@ bool retro_load_game(const struct retro_game_info *info)
    int use_drz80 = 1;
    int use_drz80_snd = 1;
 
-    for (i=0;i<NUMGAMES;i++)
-    {
-        if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
-        {
-            /* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
+	for (i=0;i<NUMGAMES;i++)
+ 	{
+		if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
+		{
+			/* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
          switch (fe_drivers[i].cores)
          {
          case 0:
             use_cyclone = 0;
-                use_drz80_snd = 0;
-                use_drz80 = 0;
+				use_drz80_snd = 0;
+				use_drz80 = 0;
             break;
          case 1:
-                use_drz80_snd = 0;
-                use_drz80 = 0;
+				use_drz80_snd = 0;
+				use_drz80 = 0;
             break;
          case 2:
             use_cyclone = 0;
             break;
          case 4:
             use_cyclone = 0;
-                use_drz80 = 0;
+				use_drz80 = 0;
             break;
          case 5:
-                use_drz80 = 0;
+				use_drz80 = 0;
             break;
          default:
             break;
          }
-            
+			
          break;
-        }
-    }
+		}
+	}
 
    /* Replace M68000 by CYCLONE */
 #if (HAS_CYCLONE)
    if (use_cyclone)
    {
-        for (i=0;i<MAX_CPU;i++)
-        {
-            int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+	   for (i=0;i<MAX_CPU;i++)
+	   {
+		   int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
 #ifdef NEOMAME
-            if (((*type)&0xff)==CPU_M68000)
+		   if (((*type)&0xff)==CPU_M68000)
 #else
-                if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
+			   if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
 #endif
-                {
-                    *type=((*type)&(~0xff))|CPU_CYCLONE;
-                }
-        }
+			   {
+				   *type=((*type)&(~0xff))|CPU_CYCLONE;
+			   }
+	   }
    }
 #endif
 
 #if (HAS_DRZ80)
-    /* Replace Z80 by DRZ80 */
-    if (use_drz80)
-    {
-        if (strcmp(drivers[game_index]->name, "aliens") != 0)
-        {
-            for (i=0;i<MAX_CPU;i++)
-            {
-                int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
-                if (((*type)&0xff)==CPU_Z80)
-                {
-                    *type=((*type)&(~0xff))|CPU_DRZ80;
-                }
-            }
-        }
-    }
+	/* Replace Z80 by DRZ80 */
+	if (use_drz80)
+	{
+		for (i=0;i<MAX_CPU;i++)
+		{
+			int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+			if (((*type)&0xff)==CPU_Z80)
+			{
+				*type=((*type)&(~0xff))|CPU_DRZ80;
+			}
+		}
+	}
 
-    /* Replace Z80 with DRZ80 only for sound CPUs */
-    if (use_drz80_snd)
-    {
-        if (strcmp(drivers[game_index]->name, "aliens") != 0)
-        {
-            for (i=0;i<MAX_CPU;i++)
-            {
-                int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
-                if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
-                {
-                    *type=((*type)&(~0xff))|CPU_DRZ80;
-                }
-            }
-        }
-    }
+	/* Replace Z80 with DRZ80 only for sound CPUs */
+	if (use_drz80_snd)
+	{
+		for (i=0;i<MAX_CPU;i++)
+		{
+			int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+			if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
+			{
+				*type=((*type)&(~0xff))|CPU_DRZ80;
+			}
+		}
+	}
 #endif
+
 #endif
 
    // Remove the mouse usage for certain games
