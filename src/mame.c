@@ -26,10 +26,6 @@ static int settingsloaded;
 
 int bitmap_dirty;	/* set by osd_clearbitmap() */
 
-int artwork_overlay = 0;
-int artwork_backdrop = 0;
-struct osd_bitmap *overlay_real_scrbitmap = 0;
-
 
 /* Used in vh_open */
 extern unsigned char *spriteram,*spriteram_2;
