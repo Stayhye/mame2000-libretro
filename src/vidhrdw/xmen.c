@@ -48,14 +48,25 @@ static void xmen_sprite_callback(int *code,int *color,int *priority_mask)
 
 int xmen_vh_start(void)
 {
-	if (K052109_vh_start(REGION_GFX1,NORMAL_PLANE_ORDER,xmen_tile_callback))
-		return 1;
-	if (K053247_vh_start(REGION_GFX2,NORMAL_PLANE_ORDER,xmen_sprite_callback))
-	{
-		K052109_vh_stop();
-		return 1;
-	}
-	return 0;
+    unsigned char *gfx2_region = memory_region(REGION_GFX2);
+    int gfx2_length = memory_region_length(REGION_GFX2);
+
+    // Validate that GFX2 (4MB sprite ROM) is fully within valid bounds and not returning a high-address/wrapped pointer
+    if (!gfx2_region || ((unsigned int)gfx2_region & 0xF0000000) || gfx2_length <= 0)
+    {
+        printf("PS2 FATAL: REGION_GFX2 is invalid! Ptr: %p, Len: %d\n", gfx2_region, gfx2_length);
+        return 1;
+    }
+
+    if (K052109_vh_start(REGION_GFX1, NORMAL_PLANE_ORDER, xmen_tile_callback))
+        return 1;
+        
+    if (K053247_vh_start(REGION_GFX2, NORMAL_PLANE_ORDER, xmen_sprite_callback))
+    {
+        K052109_vh_stop();
+        return 1;
+    }
+    return 0;
 }
 
 void xmen_vh_stop(void)
