@@ -510,151 +510,150 @@ static void scale_vectorgames(int gfx_width,int gfx_height,int *width,int *heigh
 
 static int vh_open(void)
 {
-	int i;
-	int width,height;
+    int i;
+    int width, height;
 
+    for (i = 0; i < MAX_GFX_ELEMENTS; i++) Machine->gfx[i] = 0;
+    Machine->uifont = 0;
 
-	for (i = 0;i < MAX_GFX_ELEMENTS;i++) Machine->gfx[i] = 0;
-	Machine->uifont = 0;
+    if (palette_start() != 0)
+    {
+        vh_close();
+        return 1;
+    }
 
-	if (palette_start() != 0)
-	{
-		vh_close();
-		return 1;
-	}
+    /* convert the gfx ROMs into character sets with explicit safety checks for PS2 memory boundaries */
+    if (drv->gfxdecodeinfo)
+    {
+        for (i = 0; i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1; i++)
+        {
+            unsigned char *region_base = memory_region(drv->gfxdecodeinfo[i].memory_region);
+            if (!region_base)
+            {
+                vh_close();
+                bailing = 1;
+                printf("PS2 FATAL: Missing memory region for gfx decode index %d\n", i);
+                return 1;
+            }
 
+            int reglen = 8 * memory_region_length(drv->gfxdecodeinfo[i].memory_region);
+            struct GfxLayout glcopy;
+            int j;
 
-	/* convert the gfx ROMs into character sets. This is done BEFORE calling the driver's */
-	/* convert_color_prom() routine (in palette_init()) because it might need to check the */
-	/* Machine->gfx[] data */
-	if (drv->gfxdecodeinfo)
-	{
-		for (i = 0;i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1;i++)
-		{
-			int reglen = 8*memory_region_length(drv->gfxdecodeinfo[i].memory_region);
-			struct GfxLayout glcopy;
-			int j;
+            memcpy(&glcopy, drv->gfxdecodeinfo[i].gfxlayout, sizeof(glcopy));
 
+            if (IS_FRAC(glcopy.total))
+                glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
+            for (j = 0; j < MAX_GFX_PLANES; j++)
+            {
+                if (IS_FRAC(glcopy.planeoffset[j]))
+                {
+                    glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
+                }
+            }
+            for (j = 0; j < MAX_GFX_SIZE; j++)
+            {
+                if (IS_FRAC(glcopy.xoffset[j]))
+                {
+                    glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
+                }
+                if (IS_FRAC(glcopy.yoffset[j]))
+                {
+                    glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
+                }
+            }
 
-			memcpy(&glcopy,drv->gfxdecodeinfo[i].gfxlayout,sizeof(glcopy));
+            if ((Machine->gfx[i] = decodegfx(region_base + drv->gfxdecodeinfo[i].start, &glcopy)) == 0)
+            {
+                vh_close();
+                bailing = 1;
+                printf("PS2 OUT OF MEMORY: Failed decoding gfx index %d (heap exhausted)\n", i);
+                return 1;
+            }
+            if (Machine->remapped_colortable)
+                Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
+            Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
+        }
+    }
 
-			if (IS_FRAC(glcopy.total))
-				glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
-			for (j = 0;j < MAX_GFX_PLANES;j++)
-			{
-				if (IS_FRAC(glcopy.planeoffset[j]))
-				{
-					glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
-							reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
-				}
-			}
-			for (j = 0;j < MAX_GFX_SIZE;j++)
-			{
-				if (IS_FRAC(glcopy.xoffset[j]))
-				{
-					glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
-							reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
-				}
-				if (IS_FRAC(glcopy.yoffset[j]))
-				{
-					glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
-							reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
-				}
-			}
+    width = drv->screen_width;
+    height = drv->screen_height;
 
-			if ((Machine->gfx[i] = decodegfx(memory_region(drv->gfxdecodeinfo[i].memory_region)
-					+ drv->gfxdecodeinfo[i].start,
-					&glcopy)) == 0)
-			{
-				vh_close();
+    if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
+        scale_vectorgames(options.vector_width, options.vector_height, &width, &height);
 
-				bailing = 1;
-				printf("Out of memory decoding gfx\n");
+    Machine->scrbitmap = bitmap_alloc_depth(width, height, Machine->color_depth);
+    if (!Machine->scrbitmap)
+    {
+        vh_close();
+        return 1;
+    }
 
-				return 1;
-			}
-			if (Machine->remapped_colortable)
-				Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
-			Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
-		}
-	}
+    if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
+    {
+        width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
+        height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
+    }
 
+    if (Machine->orientation & ORIENTATION_SWAP_XY)
+    {
+        int temp;
+        temp = width; width = height; height = temp;
+    }
 
-	width = drv->screen_width;
-	height = drv->screen_height;
+    /* create the display bitmap, and allocate the palette */
+    if (osd_create_display(width, height, Machine->color_depth,
+            drv->frames_per_second, drv->video_attributes, Machine->orientation))
+    {
+        printf("DEBUG FAIL: osd_create_display failed. w=%d, h=%d, depth=%d\n", width, height, Machine->color_depth);
+        vh_close();
+        return 1;
+    }
 
-	if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
-		scale_vectorgames(options.vector_width,options.vector_height,&width,&height);
+    set_visible_area(
+            drv->default_visible_area.min_x,
+            drv->default_visible_area.max_x,
+            drv->default_visible_area.min_y,
+            drv->default_visible_area.max_y);
 
-	Machine->scrbitmap = bitmap_alloc_depth(width,height,Machine->color_depth);
-	if (!Machine->scrbitmap)
-	{
-		vh_close();
-		return 1;
-	}
+    /* create spriteram buffers safely with allocation checks and clearing to prevent uninitialized faults */
+    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
+        if (spriteram_size != 0) {
+            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
+            if (!buffered_spriteram) { vh_close(); return 1; }
+            memset(buffered_spriteram, 0, spriteram_size);
 
-	if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
-	{
-		width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
-		height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
-	}
+            if (spriteram_2_size != 0) {
+                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
+                if (!buffered_spriteram_2) { vh_close(); return 1; }
+                memset(buffered_spriteram_2, 0, spriteram_2_size);
+            }
+        } else {
+            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
+            buffered_spriteram = NULL;
+            buffered_spriteram_2 = NULL;
+        }
+    }
 
-	if (Machine->orientation & ORIENTATION_SWAP_XY)
-	{
-		int temp;
-		temp = width; width = height; height = temp;
-	}
+    /* build our private user interface font */
+    if ((Machine->uifont = builduifont()) == 0)
+    {
+        vh_close();
+        return 1;
+    }
 
-	/* create the display bitmap, and allocate the palette */
-	if (osd_create_display(width,height,Machine->color_depth,
-			drv->frames_per_second,drv->video_attributes,Machine->orientation))
-	{
-		printf("DEBUG FAIL: osd_create_display failed. w=%d, h=%d, depth=%d\n", width, height, Machine->color_depth);
-		vh_close();
-		return 1;
-	}
+    /* initialize the palette */
+    if (palette_init())
+    {
+        vh_close();
+        return 1;
+    }
 
-	set_visible_area(
-			drv->default_visible_area.min_x,
-			drv->default_visible_area.max_x,
-			drv->default_visible_area.min_y,
-			drv->default_visible_area.max_y);
-
-	/* create spriteram buffers if necessary */
-	if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
-		if (spriteram_size!=0) {
-			buffered_spriteram= (unsigned char *) malloc(spriteram_size);
-			if (!buffered_spriteram) { vh_close(); return 1; }
-			if (spriteram_2_size!=0) buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
-			if (spriteram_2_size && !buffered_spriteram_2) { vh_close(); return 1; }
-		} else {
-			logerror("vh_open():  Video buffers spriteram but spriteram_size is 0\n");
-			buffered_spriteram=NULL;
-			buffered_spriteram_2=NULL;
-		}
-	}
-
-	/* build our private user interface font */
-	/* This must be done AFTER osd_create_display() so the function knows the */
-	/* resolution we are running at and can pick a different font depending on it. */
-	/* It must be done BEFORE palette_init() because that will also initialize */
-	/* (through osd_allocate_colors()) the uifont colortable. */
-	if ((Machine->uifont = builduifont()) == 0)
-	{
-		vh_close();
-		return 1;
-	}
-
-	/* initialize the palette - must be done after osd_create_display() */
-	if (palette_init())
-	{
-		vh_close();
-		return 1;
-	}
-
-	return 0;
+    return 0;
 }
-
 
 
 /***************************************************************************
