@@ -3030,59 +3030,75 @@ static unsigned char *K053247_ram;
 static int K053247_irq_enabled;
 
 
-int K053247_vh_start(int gfx_memory_region,int plane0,int plane1,int plane2,int plane3,
-		void (*callback)(int *code,int *color,int *priority))
+int K053247_vh_start(int gfx_memory_region, int plane0, int plane1, int plane2, int plane3,
+        void (*callback)(int *code, int *color, int *priority))
 {
-	int gfx_index;
-	static struct GfxLayout spritelayout =
-	{
-		16,16,
-		0,				/* filled in later */
-		4,
-		{ 0, 0, 0, 0 },	/* filled in later */
-		{ 2*4, 3*4, 0*4, 1*4, 6*4, 7*4, 4*4, 5*4,
-				10*4, 11*4, 8*4, 9*4, 14*4, 15*4, 12*4, 13*4 },
-		{ 0*64, 1*64, 2*64, 3*64, 4*64, 5*64, 6*64, 7*64,
-				8*64, 9*64, 10*64, 11*64, 12*64, 13*64, 14*64, 15*64 },
-		128*8
-	};
+    int gfx_index;
+    unsigned char *gfx_rom;
+    
+    static struct GfxLayout spritelayout =
+    {
+        16, 16,
+        0,                /* filled in later */
+        4,
+        { 0, 0, 0, 0 },   /* filled in later */
+        { 2*4, 3*4, 0*4, 1*4, 6*4, 7*4, 4*4, 5*4,
+                10*4, 11*4, 8*4, 9*4, 14*4, 15*4, 12*4, 13*4 },
+        { 0*64, 1*64, 2*64, 3*64, 4*64, 5*64, 6*64, 7*64,
+                8*64, 9*64, 10*64, 11*64, 12*64, 13*64, 14*64, 15*64 },
+        128*8
+    };
 
+    /* find first empty slot to decode gfx */
+    for (gfx_index = 0; gfx_index < MAX_GFX_ELEMENTS; gfx_index++)
+        if (Machine->gfx[gfx_index] == 0)
+            break;
+    if (gfx_index == MAX_GFX_ELEMENTS)
+        return 1;
 
-	/* find first empty slot to decode gfx */
-	for (gfx_index = 0; gfx_index < MAX_GFX_ELEMENTS; gfx_index++)
-		if (Machine->gfx[gfx_index] == 0)
-			break;
-	if (gfx_index == MAX_GFX_ELEMENTS)
-		return 1;
+    /* Validate memory region pointer before parsing length or decoding */
+    gfx_rom = memory_region(gfx_memory_region);
+    if (!gfx_rom || ((unsigned int)gfx_rom & 0xF0000000))
+    {
+        logerror("K053247: Invalid or out-of-bounds GFX region pointer: %p\n", gfx_rom);
+        return 1;
+    }
 
-	/* tweak the structure for the number of tiles we have */
-	spritelayout.total = memory_region_length(gfx_memory_region) / 128;
-	spritelayout.planeoffset[0] = plane0;
-	spritelayout.planeoffset[1] = plane1;
-	spritelayout.planeoffset[2] = plane2;
-	spritelayout.planeoffset[3] = plane3;
+    /* tweak the structure for the number of tiles we have */
+    spritelayout.total = memory_region_length(gfx_memory_region) / 128;
+    spritelayout.planeoffset[0] = plane0;
+    spritelayout.planeoffset[1] = plane1;
+    spritelayout.planeoffset[2] = plane2;
+    spritelayout.planeoffset[3] = plane3;
 
-	/* decode the graphics */
-	Machine->gfx[gfx_index] = decodegfx(memory_region(gfx_memory_region),&spritelayout);
-	if (!Machine->gfx[gfx_index])
-		return 1;
+    /* decode the graphics */
+    Machine->gfx[gfx_index] = decodegfx(gfx_rom, &spritelayout);
+    if (!Machine->gfx[gfx_index])
+        return 1;
 
-	/* set the color information */
-	Machine->gfx[gfx_index]->colortable = Machine->remapped_colortable;
-	Machine->gfx[gfx_index]->total_colors = Machine->drv->color_table_len / 16;
+    /* set the color information */
+    Machine->gfx[gfx_index]->colortable = Machine->remapped_colortable;
+    Machine->gfx[gfx_index]->total_colors = Machine->drv->color_table_len / 16;
 
-	K053247_memory_region = gfx_memory_region;
-	K053247_gfx = Machine->gfx[gfx_index];
-	K053247_callback = callback;
-	K053246_OBJCHA_line = CLEAR_LINE;
-	K053247_ram = (unsigned char*)malloc(0x1000);
-	if (!K053247_ram) return 1;
+    K053247_memory_region = gfx_memory_region;
+    K053247_gfx = Machine->gfx[gfx_index];
+    K053247_callback = callback;
+    K053246_OBJCHA_line = CLEAR_LINE;
+    
+    K053247_ram = (unsigned char*)malloc(0x1000);
+    
+    /* Strict verification for sprite RAM pointer bounds */
+    if (!K053247_ram || ((unsigned int)K053247_ram & 0xF0000000)) 
+    {
+        if (K053247_ram) free(K053247_ram);
+        logerror("K053247: Fatal allocation error for K053247_ram: %p\n", K053247_ram);
+        return 1;
+    }
 
-	memset(K053247_ram,0,0x1000);
+    memset(K053247_ram, 0, 0x1000);
 
-	return 0;
+    return 0;
 }
-
 void K053247_vh_stop(void)
 {
 	free(K053247_ram);

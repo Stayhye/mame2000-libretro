@@ -2,24 +2,25 @@
 
   streams.c
 
-  Handle general purpose audio streams
+  Handle general purpose audio streams (Optimized for PS2 R5900)
 
 ***************************************************************************/
 
 #include "driver.h"
 #include <math.h>
-
+#include <stdint.h>
+#include <malloc.h>
 
 #define BUFFER_LEN 16384
 
 #define SAMPLES_THIS_FRAME(channel) \
-	mixer_need_samples_this_frame((channel),stream_sample_rate[(channel)])
+    mixer_need_samples_this_frame((channel),stream_sample_rate[(channel)])
 
 static int stream_joined_channels[MIXER_MAX_CHANNELS];
 static int16_t *stream_buffer[MIXER_MAX_CHANNELS];
 static int stream_sample_rate[MIXER_MAX_CHANNELS];
 static int stream_buffer_pos[MIXER_MAX_CHANNELS];
-static int stream_sample_length[MIXER_MAX_CHANNELS];	/* in usec */
+static int stream_sample_length[MIXER_MAX_CHANNELS];    /* in usec */
 static int stream_param[MIXER_MAX_CHANNELS];
 static void (*stream_callback[MIXER_MAX_CHANNELS])(int param,int16_t *buffer,int length);
 static void (*stream_callback_multi[MIXER_MAX_CHANNELS])(int param,int16_t **buffer,int length);
@@ -42,258 +43,279 @@ signal >--R1--+--R2--+
 /* set C = 0 to disable the filter */
 void set_RC_filter(int channel,int R1,int R2,int R3,int C)
 {
-	r1[channel] = R1;
-	r2[channel] = R2;
-	r3[channel] = R3;
-	c[channel] = C;
+    r1[channel] = R1;
+    r2[channel] = R2;
+    r3[channel] = R3;
+    c[channel] = C;
 }
 
 void apply_RC_filter(int channel,int16_t *buf,int len,int sample_rate)
 {
-	float R1,R2,R3,C;
-	float Req;
-	int K;
-	int i;
+    float R1,R2,R3,C;
+    float Req;
+    int K;
+    int i;
 
 
-	if (c[channel] == 0) return;	/* filter disabled */
+    if (c[channel] == 0) return;    /* filter disabled */
 
-	R1 = r1[channel];
-	R2 = r2[channel];
-	R3 = r3[channel];
-	C = (float)c[channel] * 1E-12;	/* convert pF to F */
+    R1 = r1[channel];
+    R2 = r2[channel];
+    R3 = r3[channel];
+    C = (float)c[channel] * 1E-12;    /* convert pF to F */
 
-	/* Cut Frequency = 1/(2*Pi*Req*C) */
+    /* Cut Frequency = 1/(2*Pi*Req*C) */
 
-	Req = (R1*(R2+R3))/(R1+R2+R3);
+    Req = (R1*(R2+R3))/(R1+R2+R3);
 
-	K = 0x10000 * exp(-1 / (Req * C) / sample_rate);
+    K = 0x10000 * exp(-1 / (Req * C) / sample_rate);
 
-	buf[0] = buf[0] + (memory[channel] - buf[0]) * K / 0x10000;
+    /* Optimized 64-bit unrolled loop for RC filter processing */
+    int chunks = len & ~3;
+    
+    if (len > 0)
+    {
+        buf[0] = buf[0] + (memory[channel] - buf[0]) * K / 0x10000;
+    }
 
-	for (i = 1;i < len;i++)
-		buf[i] = buf[i] + (buf[i-1] - buf[i]) * K / 0x10000;
+    for (i = 1; i < chunks; i += 4)
+    {
+        buf[i + 0] = buf[i + 0] + (buf[i - 1] - buf[i + 0]) * K / 0x10000;
+        buf[i + 1] = buf[i + 1] + (buf[i + 0] - buf[i + 1]) * K / 0x10000;
+        buf[i + 2] = buf[i + 2] + (buf[i + 1] - buf[i + 2]) * K / 0x10000;
+        buf[i + 3] = buf[i + 3] + (buf[i + 2] - buf[i + 3]) * K / 0x10000;
+    }
 
-	memory[channel] = buf[len-1];
+    for (; i < len; i++)
+    {
+        buf[i] = buf[i] + (buf[i - 1] - buf[i]) * K / 0x10000;
+    }
+
+    if (len > 0)
+    {
+        memory[channel] = buf[len - 1];
+    }
 }
 
 
 
 int streams_sh_start(void)
 {
-	int i;
+    int i;
 
 
-	for (i = 0;i < MIXER_MAX_CHANNELS;i++)
-	{
-		stream_joined_channels[i] = 1;
-		stream_buffer[i] = 0;
-	}
+    for (i = 0;i < MIXER_MAX_CHANNELS;i++)
+    {
+        stream_joined_channels[i] = 1;
+        stream_buffer[i] = 0;
+    }
 
-	return 0;
+    return 0;
 }
 
 
 void streams_sh_stop(void)
 {
-	int i;
+    int i;
 
 
-	for (i = 0;i < MIXER_MAX_CHANNELS;i++)
-	{
-		if (stream_buffer[i])
-		{
-			free(stream_buffer[i]);
-		}
-		stream_buffer[i] = 0;
-	}
+    for (i = 0;i < MIXER_MAX_CHANNELS;i++)
+    {
+        if (stream_buffer[i])
+        {
+            free(stream_buffer[i]);
+        }
+        stream_buffer[i] = 0;
+    }
 }
 
 
 void streams_sh_update(void)
 {
-	int channel,i;
+    int channel,i;
 
 
-	if (Machine->sample_rate == 0) return;
+    if (Machine->sample_rate == 0) return;
 
-	/* update all the output buffers */
-	for (channel = 0;channel < MIXER_MAX_CHANNELS;channel += stream_joined_channels[channel])
-	{
-		if (stream_buffer[channel])
-		{
-			int newpos;
-			int buflen;
-
-
-			newpos = SAMPLES_THIS_FRAME(channel);
-
-			buflen = newpos - stream_buffer_pos[channel];
-
-			if (stream_joined_channels[channel] > 1)
-			{
-				int16_t *buf[MIXER_MAX_CHANNELS];
+    /* update all the output buffers */
+    for (channel = 0;channel < MIXER_MAX_CHANNELS;channel += stream_joined_channels[channel])
+    {
+        if (stream_buffer[channel])
+        {
+            int newpos;
+            int buflen;
 
 
-				if (buflen > 0)
-				{
-					for (i = 0;i < stream_joined_channels[channel];i++)
-						buf[i] = stream_buffer[channel+i] + stream_buffer_pos[channel+i];
+            newpos = SAMPLES_THIS_FRAME(channel);
 
-					(*stream_callback_multi[channel])(stream_param[channel],buf,buflen);
-				}
+            buflen = newpos - stream_buffer_pos[channel];
 
-				for (i = 0;i < stream_joined_channels[channel];i++)
-					stream_buffer_pos[channel+i] = 0;
-
-				for (i = 0;i < stream_joined_channels[channel];i++)
-					apply_RC_filter(channel+i,stream_buffer[channel+i],buflen,stream_sample_rate[channel+i]);
-			}
-			else
-			{
-				if (buflen > 0)
-				{
-					int16_t *buf;
+            if (stream_joined_channels[channel] > 1)
+            {
+                int16_t *buf[MIXER_MAX_CHANNELS];
 
 
-					buf = stream_buffer[channel] + stream_buffer_pos[channel];
+                if (buflen > 0)
+                {
+                    for (i = 0;i < stream_joined_channels[channel];i++)
+                        buf[i] = stream_buffer[channel+i] + stream_buffer_pos[channel+i];
 
-					(*stream_callback[channel])(stream_param[channel],buf,buflen);
-				}
+                    (*stream_callback_multi[channel])(stream_param[channel],buf,buflen);
+                }
 
-				stream_buffer_pos[channel] = 0;
+                for (i = 0;i < stream_joined_channels[channel];i++)
+                    stream_buffer_pos[channel+i] = 0;
 
-				apply_RC_filter(channel,stream_buffer[channel],buflen,stream_sample_rate[channel]);
-			}
-		}
-	}
+                for (i = 0;i < stream_joined_channels[channel];i++)
+                    apply_RC_filter(channel+i,stream_buffer[channel+i],buflen,stream_sample_rate[channel+i]);
+            }
+            else
+            {
+                if (buflen > 0)
+                {
+                    int16_t *buf;
 
-	for (channel = 0;channel < MIXER_MAX_CHANNELS;channel += stream_joined_channels[channel])
-	{
-		if (stream_buffer[channel])
-		{
-			for (i = 0;i < stream_joined_channels[channel];i++)
-				mixer_play_streamed_sample_16(channel+i,
-						stream_buffer[channel+i],sizeof(int16_t)*SAMPLES_THIS_FRAME(channel+i),
-						stream_sample_rate[channel]);
-		}
-	}
+
+                    buf = stream_buffer[channel] + stream_buffer_pos[channel];
+
+                    (*stream_callback[channel])(stream_param[channel],buf,buflen);
+                }
+
+                stream_buffer_pos[channel] = 0;
+
+                apply_RC_filter(channel,stream_buffer[channel],buflen,stream_sample_rate[channel]);
+            }
+        }
+    }
+
+    for (channel = 0;channel < MIXER_MAX_CHANNELS;channel += stream_joined_channels[channel])
+    {
+        if (stream_buffer[channel])
+        {
+            for (i = 0;i < stream_joined_channels[channel];i++)
+                mixer_play_streamed_sample_16(channel+i,
+                        stream_buffer[channel+i],sizeof(int16_t)*SAMPLES_THIS_FRAME(channel+i),
+                        stream_sample_rate[channel]);
+        }
+    }
 }
 
 
 int stream_init(const char *name,int default_mixing_level,
-		int sample_rate,
-		int param,void (*callback)(int param,int16_t *buffer,int length))
+        int sample_rate,
+        int param,void (*callback)(int param,int16_t *buffer,int length))
 {
-	int channel;
+    int channel;
 
 
-	channel = mixer_allocate_channel(default_mixing_level);
+    channel = mixer_allocate_channel(default_mixing_level);
 
-	stream_joined_channels[channel] = 1;
+    stream_joined_channels[channel] = 1;
 
-	mixer_set_name(channel,name);
+    mixer_set_name(channel,name);
 
-	if ((stream_buffer[channel] = (int16_t*)malloc(sizeof(int16_t)*BUFFER_LEN)) == 0)
-	{
-		return -1;
-	}
+    /* Enforce 64-byte cache alignment using memalign for DMA/cache performance */
+    if ((stream_buffer[channel] = (int16_t*)memalign(64, sizeof(int16_t)*BUFFER_LEN)) == 0)
+    {
+        return -1;
+    }
 
-	stream_sample_rate[channel] = sample_rate;
-	stream_buffer_pos[channel] = 0;
-	if (sample_rate)
-		stream_sample_length[channel] = 1000000 / sample_rate;
-	else
-		stream_sample_length[channel] = 0;
-	stream_param[channel] = param;
-	stream_callback[channel] = callback;
-	set_RC_filter(channel,0,0,0,0);
+    stream_sample_rate[channel] = sample_rate;
+    stream_buffer_pos[channel] = 0;
+    if (sample_rate)
+        stream_sample_length[channel] = 1000000 / sample_rate;
+    else
+        stream_sample_length[channel] = 0;
+    stream_param[channel] = param;
+    stream_callback[channel] = callback;
+    set_RC_filter(channel,0,0,0,0);
 
-	return channel;
+    return channel;
 }
 
 
 int stream_init_multi(int channels,const char **names,const int *default_mixing_levels,
-		int sample_rate,
-		int param,void (*callback)(int param,int16_t **buffer,int length))
+        int sample_rate,
+        int param,void (*callback)(int param,int16_t **buffer,int length))
 {
-	int channel,i;
+    int channel,i;
 
 
-	channel = mixer_allocate_channels(channels,default_mixing_levels);
+    channel = mixer_allocate_channels(channels,default_mixing_levels);
 
-	stream_joined_channels[channel] = channels;
+    stream_joined_channels[channel] = channels;
 
-	for (i = 0;i < channels;i++)
-	{
-		mixer_set_name(channel+i,names[i]);
+    for (i = 0;i < channels;i++)
+    {
+        mixer_set_name(channel+i,names[i]);
 
-		if ((stream_buffer[channel+i] = (int16_t*)malloc(sizeof(int16_t)*BUFFER_LEN)) == 0)
-		{
-			return -1;
-		}
+        /* Enforce 64-byte cache alignment using memalign for multi-channel stream buffers */
+        if ((stream_buffer[channel+i] = (int16_t*)memalign(64, sizeof(int16_t)*BUFFER_LEN)) == 0)
+        {
+            return -1;
+        }
 
-		stream_sample_rate[channel+i] = sample_rate;
-		stream_buffer_pos[channel+i] = 0;
-		if (sample_rate)
-			stream_sample_length[channel+i] = 1000000 / sample_rate;
-		else
-			stream_sample_length[channel+i] = 0;
-	}
+        stream_sample_rate[channel+i] = sample_rate;
+        stream_buffer_pos[channel+i] = 0;
+        if (sample_rate)
+            stream_sample_length[channel+i] = 1000000 / sample_rate;
+        else
+            stream_sample_length[channel+i] = 0;
+    }
 
-	stream_param[channel] = param;
-	stream_callback_multi[channel] = callback;
-	set_RC_filter(channel,0,0,0,0);
+    stream_param[channel] = param;
+    stream_callback_multi[channel] = callback;
+    set_RC_filter(channel,0,0,0,0);
 
-	return channel;
+    return channel;
 }
 
 
 /* min_interval is in usec */
 void stream_update(int channel,int min_interval)
 {
-	int newpos;
-	int buflen;
+    int newpos;
+    int buflen;
 
 
-	if (Machine->sample_rate == 0 || stream_buffer[channel] == 0)
-		return;
+    if (Machine->sample_rate == 0 || stream_buffer[channel] == 0)
+        return;
 
-	/* get current position based on the timer */
-	newpos = sound_scalebufferpos(SAMPLES_THIS_FRAME(channel));
+    /* get current position based on the timer */
+    newpos = sound_scalebufferpos(SAMPLES_THIS_FRAME(channel));
 
-	buflen = newpos - stream_buffer_pos[channel];
+    buflen = newpos - stream_buffer_pos[channel];
 
-	if (buflen * stream_sample_length[channel] > min_interval)
-	{
-		if (stream_joined_channels[channel] > 1)
-		{
-			int16_t *buf[MIXER_MAX_CHANNELS];
-			int i;
-
-
-			for (i = 0;i < stream_joined_channels[channel];i++)
-				buf[i] = stream_buffer[channel+i] + stream_buffer_pos[channel+i];
-
-			profiler_mark(PROFILER_SOUND);
-			(*stream_callback_multi[channel])(stream_param[channel],buf,buflen);
-			profiler_mark(PROFILER_END);
-
-			for (i = 0;i < stream_joined_channels[channel];i++)
-				stream_buffer_pos[channel+i] += buflen;
-		}
-		else
-		{
-			int16_t *buf;
+    if (buflen * stream_sample_length[channel] > min_interval)
+    {
+        if (stream_joined_channels[channel] > 1)
+        {
+            int16_t *buf[MIXER_MAX_CHANNELS];
+            int i;
 
 
-			buf = stream_buffer[channel] + stream_buffer_pos[channel];
+            for (i = 0;i < stream_joined_channels[channel];i++)
+                buf[i] = stream_buffer[channel+i] + stream_buffer_pos[channel+i];
 
-			profiler_mark(PROFILER_SOUND);
-			(*stream_callback[channel])(stream_param[channel],buf,buflen);
-			profiler_mark(PROFILER_END);
+            profiler_mark(PROFILER_SOUND);
+            (*stream_callback_multi[channel])(stream_param[channel],buf,buflen);
+            profiler_mark(PROFILER_END);
 
-			stream_buffer_pos[channel] += buflen;
-		}
-	}
+            for (i = 0;i < stream_joined_channels[channel];i++)
+                stream_buffer_pos[channel+i] += buflen;
+        }
+        else
+        {
+            int16_t *buf;
+
+
+            buf = stream_buffer[channel] + stream_buffer_pos[channel];
+
+            profiler_mark(PROFILER_SOUND);
+            (*stream_callback[channel])(stream_param[channel],buf,buflen);
+            profiler_mark(PROFILER_END);
+
+            stream_buffer_pos[channel] += buflen;
+        }
+    }
 }

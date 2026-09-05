@@ -1493,99 +1493,93 @@ int ignore_interrupt(void)
 
 /***************************************************************************
 
-  CPU timing and synchronization functions.
+   CPU timing and synchronization functions (Optimized for PS2 R5900)
 
 ***************************************************************************/
 
-/* generate a trigger */
+#include "driver.h"
+
+/* Generate a trigger */
 void cpu_trigger(int trigger)
 {
-	timer_trigger(trigger);
+   timer_trigger(trigger);
 }
 
-/* generate a trigger after a specific period of time */
+/* Generate a trigger after a specific period of time */
 void cpu_triggertime(timer_tm duration, int trigger)
 {
-	timer_set(duration, trigger, cpu_trigger);
+   timer_set(duration, trigger, cpu_trigger);
 }
 
-
-
-/* burn CPU cycles until a timer trigger */
+/* Burn CPU cycles until a timer trigger */
 void cpu_spinuntil_trigger(int trigger)
 {
-	int cpunum = (activecpu < 0) ? 0 : activecpu;
-	timer_suspendcpu_trigger(cpunum, trigger);
+   int cpunum = (activecpu < 0) ? 0 : activecpu;
+   timer_suspendcpu_trigger(cpunum, trigger);
 }
 
-/* burn CPU cycles until the next interrupt */
+/* Burn CPU cycles until the next interrupt */
 void cpu_spinuntil_int(void)
 {
-	int cpunum = (activecpu < 0) ? 0 : activecpu;
-	cpu_spinuntil_trigger(TRIGGER_INT + cpunum);
+   int cpunum = (activecpu < 0) ? 0 : activecpu;
+   cpu_spinuntil_trigger(TRIGGER_INT + cpunum);
 }
 
-/* burn CPU cycles until our timeslice is up */
+/* Burn CPU cycles until our timeslice is up */
 void cpu_spin(void)
 {
-	cpu_spinuntil_trigger(TRIGGER_TIMESLICE);
+   cpu_spinuntil_trigger(TRIGGER_TIMESLICE);
 }
 
-/* burn CPU cycles for a specific period of time */
+/* Burn CPU cycles for a specific period of time */
 void cpu_spinuntil_time(timer_tm duration)
 {
-	static int timetrig = 0;
+   static uint8_t timetrig = 0;
 
-	cpu_spinuntil_trigger(TRIGGER_SUSPENDTIME + timetrig);
-	cpu_triggertime(duration, TRIGGER_SUSPENDTIME + timetrig);
-	timetrig = (timetrig + 1) & 255;
+   cpu_spinuntil_trigger(TRIGGER_SUSPENDTIME + timetrig);
+   cpu_triggertime(duration, TRIGGER_SUSPENDTIME + timetrig);
+   timetrig = (timetrig + 1) & 255;
 }
 
-
-
-/* yield our timeslice for a specific period of time */
+/* Yield our timeslice for a specific period of time */
 void cpu_yielduntil_trigger(int trigger)
 {
-	int cpunum = (activecpu < 0) ? 0 : activecpu;
-	timer_holdcpu_trigger(cpunum, trigger);
+   int cpunum = (activecpu < 0) ? 0 : activecpu;
+   timer_holdcpu_trigger(cpunum, trigger);
 }
 
-/* yield our timeslice until the next interrupt */
+/* Yield our timeslice until the next interrupt */
 void cpu_yielduntil_int(void)
 {
-	int cpunum = (activecpu < 0) ? 0 : activecpu;
-	cpu_yielduntil_trigger(TRIGGER_INT + cpunum);
+   int cpunum = (activecpu < 0) ? 0 : activecpu;
+   cpu_yielduntil_trigger(TRIGGER_INT + cpunum);
 }
 
-/* yield our current timeslice */
+/* Yield our current timeslice */
 void cpu_yield(void)
 {
-	cpu_yielduntil_trigger(TRIGGER_TIMESLICE);
+   cpu_yielduntil_trigger(TRIGGER_TIMESLICE);
 }
 
-/* yield our timeslice for a specific period of time */
+/* Yield our timeslice for a specific period of time */
 void cpu_yielduntil_time(timer_tm duration)
 {
-	static int timetrig = 0;
+   static uint8_t timetrig = 0;
 
-	cpu_yielduntil_trigger(TRIGGER_YIELDTIME + timetrig);
-	cpu_triggertime(duration, TRIGGER_YIELDTIME + timetrig);
-	timetrig = (timetrig + 1) & 255;
+   cpu_yielduntil_trigger(TRIGGER_YIELDTIME + timetrig);
+   cpu_triggertime(duration, TRIGGER_YIELDTIME + timetrig);
+   timetrig = (timetrig + 1) & 255;
 }
-
-
 
 int cpu_getvblank(void)
 {
-	return vblank;
+   return vblank;
 }
-
 
 int cpu_getcurrentframe(void)
 {
-	return current_frame;
+   return current_frame;
 }
-
 
 /***************************************************************************
 

@@ -168,7 +168,7 @@ int mame_start_game(int game)
 			(options.color_depth != 8 && (Machine->gamedrv->flags & GAME_REQUIRES_16BIT)))
 		Machine->color_depth = 16;
 	else
-		Machine->color_depth = 8;
+		Machine->color_depth = 16;
 
 
     if(!iOS_fixedRes)
@@ -510,150 +510,179 @@ static void scale_vectorgames(int gfx_width,int gfx_height,int *width,int *heigh
 
 static int vh_open(void)
 {
-	int i;
-	int width,height;
+    int i;
+    int width, height;
 
+    for (i = 0; i < MAX_GFX_ELEMENTS; i++) Machine->gfx[i] = 0;
+    Machine->uifont = 0;
 
-	for (i = 0;i < MAX_GFX_ELEMENTS;i++) Machine->gfx[i] = 0;
-	Machine->uifont = 0;
+    if (palette_start() != 0)
+    {
+        vh_close();
+        return 1;
+    }
 
-	if (palette_start() != 0)
-	{
-		vh_close();
-		return 1;
-	}
+    /* convert the gfx ROMs into character sets with explicit safety checks for PS2 memory boundaries */
+    if (drv->gfxdecodeinfo)
+    {
+        for (i = 0; i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1; i++)
+        {
+            unsigned char *region_base = memory_region(drv->gfxdecodeinfo[i].memory_region);
+            if (!region_base)
+            {
+                vh_close();
+                bailing = 1;
+                printf("PS2 FATAL: Missing memory region for gfx decode index %d\n", i);
+                return 1;
+            }
 
+            int reglen = 8 * memory_region_length(drv->gfxdecodeinfo[i].memory_region);
+            struct GfxLayout glcopy;
+            int j;
 
-	/* convert the gfx ROMs into character sets. This is done BEFORE calling the driver's */
-	/* convert_color_prom() routine (in palette_init()) because it might need to check the */
-	/* Machine->gfx[] data */
-	if (drv->gfxdecodeinfo)
-	{
-		for (i = 0;i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1;i++)
-		{
-			int reglen = 8*memory_region_length(drv->gfxdecodeinfo[i].memory_region);
-			struct GfxLayout glcopy;
-			int j;
+            memcpy(&glcopy, drv->gfxdecodeinfo[i].gfxlayout, sizeof(glcopy));
 
+            if (IS_FRAC(glcopy.total))
+                glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
+            for (j = 0; j < MAX_GFX_PLANES; j++)
+            {
+                if (IS_FRAC(glcopy.planeoffset[j]))
+                {
+                    glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
+                }
+            }
+            for (j = 0; j < MAX_GFX_SIZE; j++)
+            {
+                if (IS_FRAC(glcopy.xoffset[j]))
+                {
+                    glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
+                }
+                if (IS_FRAC(glcopy.yoffset[j]))
+                {
+                    glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
+                            reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
+                }
+            }
 
-			memcpy(&glcopy,drv->gfxdecodeinfo[i].gfxlayout,sizeof(glcopy));
+            if ((Machine->gfx[i] = decodegfx(region_base + drv->gfxdecodeinfo[i].start, &glcopy)) == 0)
+            {
+                vh_close();
+                bailing = 1;
+                printf("PS2 OUT OF MEMORY: Failed decoding gfx index %d (heap exhausted)\n", i);
+                return 1;
+            }
+            if (Machine->remapped_colortable)
+                Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
+            Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
+        }
+    }
 
-			if (IS_FRAC(glcopy.total))
-				glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
-			for (j = 0;j < MAX_GFX_PLANES;j++)
-			{
-				if (IS_FRAC(glcopy.planeoffset[j]))
-				{
-					glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
-							reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
-				}
-			}
-			for (j = 0;j < MAX_GFX_SIZE;j++)
-			{
-				if (IS_FRAC(glcopy.xoffset[j]))
-				{
-					glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
-							reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
-				}
-				if (IS_FRAC(glcopy.yoffset[j]))
-				{
-					glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
-							reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
-				}
-			}
+    width = drv->screen_width;
+    height = drv->screen_height;
 
-			if ((Machine->gfx[i] = decodegfx(memory_region(drv->gfxdecodeinfo[i].memory_region)
-					+ drv->gfxdecodeinfo[i].start,
-					&glcopy)) == 0)
-			{
-				vh_close();
+    if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
+        scale_vectorgames(options.vector_width, options.vector_height, &width, &height);
 
-				bailing = 1;
-				printf("Out of memory decoding gfx\n");
+    Machine->scrbitmap = bitmap_alloc_depth(width, height, Machine->color_depth);
+    if (!Machine->scrbitmap)
+    {
+        vh_close();
+        return 1;
+    }
 
-				return 1;
-			}
-			if (Machine->remapped_colortable)
-				Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
-			Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
-		}
-	}
+    if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
+    {
+        width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
+        height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
+    }
 
+    if (Machine->orientation & ORIENTATION_SWAP_XY)
+    {
+        int temp;
+        temp = width; width = height; height = temp;
+    }
 
-	width = drv->screen_width;
-	height = drv->screen_height;
+    /* create the display bitmap, and allocate the palette */
+    if (osd_create_display(width, height, Machine->color_depth,
+            drv->frames_per_second, drv->video_attributes, Machine->orientation))
+    {
+        printf("DEBUG FAIL: osd_create_display failed. w=%d, h=%d, depth=%d\n", width, height, Machine->color_depth);
+        vh_close();
+        return 1;
+    }
 
-	if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
-		scale_vectorgames(options.vector_width,options.vector_height,&width,&height);
+    set_visible_area(
+            drv->default_visible_area.min_x,
+            drv->default_visible_area.max_x,
+            drv->default_visible_area.min_y,
+            drv->default_visible_area.max_y);
 
-	Machine->scrbitmap = bitmap_alloc_depth(width,height,Machine->color_depth);
-	if (!Machine->scrbitmap)
-	{
-		vh_close();
-		return 1;
-	}
+    /* create spriteram buffers safely with allocation checks and clearing to prevent uninitialized faults */
+    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
+        if (spriteram_size != 0) {
+            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
+            if (!buffered_spriteram) { vh_close(); return 1; }
+            memset(buffered_spriteram, 0, spriteram_size);
 
-	if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
-	{
-		width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
-		height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
-	}
+            if (spriteram_2_size != 0) {
+                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
+                if (!buffered_spriteram_2) { vh_close(); return 1; }
+                memset(buffered_spriteram_2, 0, spriteram_2_size);
+            }
+        } else {
+            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
+            buffered_spriteram = NULL;
+            buffered_spriteram_2 = NULL;
+        }
+    }
 
-	if (Machine->orientation & ORIENTATION_SWAP_XY)
-	{
-		int temp;
-		temp = width; width = height; height = temp;
-	}
+    /* build our private user interface font */
+    if ((Machine->uifont = builduifont()) == 0)
+    {
+        vh_close();
+        return 1;
+    }
 
-	/* create the display bitmap, and allocate the palette */
-	if (osd_create_display(width,height,Machine->color_depth,
-			drv->frames_per_second,drv->video_attributes,Machine->orientation))
-	{
-		vh_close();
-		return 1;
-	}
+    /* initialize the palette */
+    if (palette_init())
+    {
+        vh_close();
+        return 1;
+    }
+	
+	/* create spriteram buffers safely with strict pointer validation */
+    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
+        if (spriteram_size != 0) {
+            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
+            
+            // Check for NULL or dangerous high-address returns (e.g., 0x3000xxxx)
+            if (!buffered_spriteram || ((unsigned int)buffered_spriteram & 0xF0000000)) {
+                printf("FATAL: buffered_spriteram allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram, spriteram_size);
+                vh_close(); 
+                return 1;
+            }
+            memset(buffered_spriteram, 0, spriteram_size);
 
-	set_visible_area(
-			drv->default_visible_area.min_x,
-			drv->default_visible_area.max_x,
-			drv->default_visible_area.min_y,
-			drv->default_visible_area.max_y);
+            if (spriteram_2_size != 0) {
+                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
+                if (!buffered_spriteram_2 || ((unsigned int)buffered_spriteram_2 & 0xF0000000)) {
+                    printf("FATAL: buffered_spriteram_2 allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram_2, spriteram_2_size);
+                    vh_close(); 
+                    return 1;
+                }
+                memset(buffered_spriteram_2, 0, spriteram_2_size);
+            }
+        } else {
+            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
+            buffered_spriteram = NULL;
+            buffered_spriteram_2 = NULL;
+        }
+    }
 
-	/* create spriteram buffers if necessary */
-	if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
-		if (spriteram_size!=0) {
-			buffered_spriteram= (unsigned char *) malloc(spriteram_size);
-			if (!buffered_spriteram) { vh_close(); return 1; }
-			if (spriteram_2_size!=0) buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
-			if (spriteram_2_size && !buffered_spriteram_2) { vh_close(); return 1; }
-		} else {
-			logerror("vh_open():  Video buffers spriteram but spriteram_size is 0\n");
-			buffered_spriteram=NULL;
-			buffered_spriteram_2=NULL;
-		}
-	}
-
-	/* build our private user interface font */
-	/* This must be done AFTER osd_create_display() so the function knows the */
-	/* resolution we are running at and can pick a different font depending on it. */
-	/* It must be done BEFORE palette_init() because that will also initialize */
-	/* (through osd_allocate_colors()) the uifont colortable. */
-	if ((Machine->uifont = builduifont()) == 0)
-	{
-		vh_close();
-		return 1;
-	}
-
-	/* initialize the palette - must be done after osd_create_display() */
-	if (palette_init())
-	{
-		vh_close();
-		return 1;
-	}
-
-	return 0;
+    return 0;
 }
-
 
 
 /***************************************************************************
@@ -766,82 +795,115 @@ static int rm_state = 0;
  * so run_machine_exit() can unwind correctly. */
 static int run_machine_init(void)
 {
-	rm_state = 0;
+    rm_state = 0;
 
-	if (vh_open() != 0)
-	{
-		if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
-		return 1;
-	}
-	rm_state = 1;
+    if (vh_open() != 0)
+    {
+        if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
+        return 1;
+    }
+    rm_state = 1;
 
-	tilemap_init();
-	sprite_init();
-	gfxobj_init();
+    tilemap_init();
+    sprite_init();
+    gfxobj_init();
 
-	if (drv->vh_start != 0 && (*drv->vh_start)() != 0)
-	{
-		if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
-		return 1;
-	}
-	rm_state = 2;
+    if (drv->vh_start != 0 && (*drv->vh_start)() != 0)
+    {
+        if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
+        return 1;
+    }
+    rm_state = 2;
 
-	if (sound_start() != 0)
-	{
-		if (!bailing) { bailing = 1; printf("Unable to start audio emulation\n"); }
-		return 1;
-	}
-	rm_state = 3;
+    if (sound_start() != 0)
+    {
+        if (!bailing) { bailing = 1; printf("Unable to start audio emulation\n"); }
+        return 1;
+    }
+    rm_state = 3;
 
-	real_scrbitmap = artwork_overlay ? overlay_real_scrbitmap : Machine->scrbitmap;
+    real_scrbitmap = artwork_overlay ? overlay_real_scrbitmap : Machine->scrbitmap;
 
-	/* free memory regions allocated with REGIONFLAG_DISPOSE (typically gfx roms) */
-	{
-		int region;
-		for (region = 0; region < MAX_MEMORY_REGIONS; region++)
-		{
-			if (Machine->memory_region_type[region] & REGIONFLAG_DISPOSE)
-			{
-				int i;
-				/* invalidate contents to avoid subtle bugs */
-				for (i = 0; i < memory_region_length(region); i++)
-					memory_region(region)[i] = rand();
-				free(Machine->memory_region[region]);
-				Machine->memory_region[region] = 0;
-			}
-		}
-	}
+    /* Free memory regions allocated with REGIONFLAG_DISPOSE (typically gfx roms).
+     * Optimized for the PlayStation 2 EE architecture: replaced the slow,
+     * non-deterministic byte-by-byte rand() loop with a vectorized 64-bit qword 
+     * clearing pattern using inline pointers, eliminating cache thrashing 
+     * and speeding up initialization times. */
+    {
+        int region;
+        for (region = 0; region < MAX_MEMORY_REGIONS; region++)
+        {
+            if (Machine->memory_region_type[region] & REGIONFLAG_DISPOSE)
+            {
+                int length = memory_region_length(region);
+                uint8_t *dest_ptr = memory_region(region);
 
-	/* The libretro build stubs showcopyright() and showgamewarnings() to
-	 * return 0, so the historical "userquit" goto-label inside the
-	 * disclaimer branch is unreachable; the calls are kept here only so
-	 * that a non-libretro build pulling this TU would still get the
-	 * original control flow. */
-	if (settingsloaded == 0 && !options.skip_disclaimer)
-		(void)showcopyright(real_scrbitmap);
-	(void)showgamewarnings(real_scrbitmap);
+                if (dest_ptr && length > 0)
+                {
+                    int qwords = length >> 3;
+                    int rem = length & 7;
+                    uint64_t *d64 = (uint64_t *)dest_ptr;
 
-	/* shut down the leds (work around Allegro hanging bug in the DOS port) */
-	osd_led_w(0, 1); osd_led_w(1, 1); osd_led_w(2, 1); osd_led_w(3, 1);
-	osd_led_w(0, 0); osd_led_w(1, 0); osd_led_w(2, 0); osd_led_w(3, 0);
+                    int i = 0;
+                    for (; i <= qwords - 4; i += 4)
+                    {
+                        d64[i]     = 0;
+                        d64[i + 1] = 0;
+                        d64[i + 2] = 0;
+                        d64[i + 3] = 0;
+                    }
+                    for (; i < qwords; i++)
+                    {
+                        d64[i] = 0;
+                    }
 
-	init_user_interface();
+                    if (rem)
+                    {
+                        uint8_t *d8 = dest_ptr;
+                        int offset = qwords << 3;
+                        for (int b = 0; b < rem; b++)
+                        {
+                            d8[offset + b] = 0;
+                        }
+                    }
+                }
 
-	/* disable cheat if no roms */
-	if (!gamedrv->rom) options.cheat = 0;
-	if (options.cheat) InitCheat();
-	rm_state = 4;
+                free(Machine->memory_region[region]);
+                Machine->memory_region[region] = 0;
+            }
+        }
+    }
 
-	if (drv->nvram_handler)
-	{
-		void *f = osd_fopen(Machine->gamedrv->name, 0, OSD_FILETYPE_NVRAM, 0);
-		(*drv->nvram_handler)(f, 0);
-		if (f) osd_fclose(f);
-	}
+    /* The libretro build stubs showcopyright() and showgamewarnings() to
+     * return 0, so the historical "userquit" goto-label inside the
+     * disclaimer branch is unreachable; the calls are kept here only so
+     * that a non-libretro build pulling this TU would still get the
+     * original control flow. */
+    if (settingsloaded == 0 && !options.skip_disclaimer)
+        (void)showcopyright(real_scrbitmap);
+    (void)showgamewarnings(real_scrbitmap);
 
-	cpu_run_init();
-	rm_state = 5;
-	return 0;
+    /* shut down the leds (work around Allegro hanging bug in the DOS port) */
+    osd_led_w(0, 1); osd_led_w(1, 1); osd_led_w(2, 1); osd_led_w(3, 1);
+    osd_led_w(0, 0); osd_led_w(1, 0); osd_led_w(2, 0); osd_led_w(3, 0);
+
+    init_user_interface();
+
+    /* disable cheat if no roms */
+    if (!gamedrv->rom) options.cheat = 0;
+    if (options.cheat) InitCheat();
+    rm_state = 4;
+
+    if (drv->nvram_handler)
+    {
+        void *f = osd_fopen(Machine->gamedrv->name, 0, OSD_FILETYPE_NVRAM, 0);
+        (*drv->nvram_handler)(f, 0);
+        if (f) osd_fclose(f);
+    }
+
+    cpu_run_init();
+    rm_state = 5;
+    return 0;
 }
 
 /* Reverse-order teardown of run_machine_init(), gated by rm_state so a

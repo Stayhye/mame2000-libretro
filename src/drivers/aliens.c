@@ -291,7 +291,7 @@ static struct MachineDriver machine_driver_aliens =
 		}
 	},
 	60, DEFAULT_60HZ_VBLANK_DURATION,	/* frames per second, vblank duration */
-	1,	/* 1 CPU slice per frame - interleaving is forced when a sound command is written */
+	50,	/* 1 CPU slice per frame - interleaving is forced when a sound command is written */
 	aliens_init_machine,
 
 	/* video hardware */

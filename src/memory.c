@@ -157,58 +157,65 @@ READ_HANDLER(mrh_nop)
 
 /***************************************************************************
 
-  Memory write handling
+  Memory write handling (Safeguarded for PS2)
 
 ***************************************************************************/
 
-WRITE_HANDLER(mwh_ram)		{ cpu_bankbase[0][offset] = data;}
-WRITE_HANDLER(mwh_bank1)	{ cpu_bankbase[1][offset] = data; }
-WRITE_HANDLER(mwh_bank2)	{ cpu_bankbase[2][offset] = data; }
-WRITE_HANDLER(mwh_bank3)	{ cpu_bankbase[3][offset] = data; }
-WRITE_HANDLER(mwh_bank4)	{ cpu_bankbase[4][offset] = data; }
-WRITE_HANDLER(mwh_bank5)	{ cpu_bankbase[5][offset] = data; }
-WRITE_HANDLER(mwh_bank6)	{ cpu_bankbase[6][offset] = data; }
-WRITE_HANDLER(mwh_bank7)	{ cpu_bankbase[7][offset] = data; }
-WRITE_HANDLER(mwh_bank8)	{ cpu_bankbase[8][offset] = data; }
-WRITE_HANDLER(mwh_bank9)	{ cpu_bankbase[9][offset] = data; }
-WRITE_HANDLER(mwh_bank10)	{ cpu_bankbase[10][offset] = data; }
-WRITE_HANDLER(mwh_bank11)	{ cpu_bankbase[11][offset] = data; }
-WRITE_HANDLER(mwh_bank12)	{ cpu_bankbase[12][offset] = data; }
-WRITE_HANDLER(mwh_bank13)	{ cpu_bankbase[13][offset] = data; }
-WRITE_HANDLER(mwh_bank14)	{ cpu_bankbase[14][offset] = data; }
-WRITE_HANDLER(mwh_bank15)	{ cpu_bankbase[15][offset] = data; }
-WRITE_HANDLER(mwh_bank16)	{ cpu_bankbase[16][offset] = data; }
+WRITE_HANDLER(mwh_ram)        
+{ 
+    if (offset & 0x30000000) return; // Guard against high-address wrap-arounds
+    cpu_bankbase[0][offset] = data;
+}
+WRITE_HANDLER(mwh_bank1)    { if (offset & 0x30000000) return; cpu_bankbase[1][offset] = data; }
+WRITE_HANDLER(mwh_bank2)    { if (offset & 0x30000000) return; cpu_bankbase[2][offset] = data; }
+WRITE_HANDLER(mwh_bank3)    { if (offset & 0x30000000) return; cpu_bankbase[3][offset] = data; }
+WRITE_HANDLER(mwh_bank4)    { if (offset & 0x30000000) return; cpu_bankbase[4][offset] = data; }
+WRITE_HANDLER(mwh_bank5)    { if (offset & 0x30000000) return; cpu_bankbase[5][offset] = data; }
+WRITE_HANDLER(mwh_bank6)    { if (offset & 0x30000000) return; cpu_bankbase[6][offset] = data; }
+WRITE_HANDLER(mwh_bank7)    { if (offset & 0x30000000) return; cpu_bankbase[7][offset] = data; }
+WRITE_HANDLER(mwh_bank8)    { if (offset & 0x30000000) return; cpu_bankbase[8][offset] = data; }
+WRITE_HANDLER(mwh_bank9)    { if (offset & 0x30000000) return; cpu_bankbase[9][offset] = data; }
+WRITE_HANDLER(mwh_bank10)   { if (offset & 0x30000000) return; cpu_bankbase[10][offset] = data; }
+WRITE_HANDLER(mwh_bank11)   { if (offset & 0x30000000) return; cpu_bankbase[11][offset] = data; }
+WRITE_HANDLER(mwh_bank12)   { if (offset & 0x30000000) return; cpu_bankbase[12][offset] = data; }
+WRITE_HANDLER(mwh_bank13)   { if (offset & 0x30000000) return; cpu_bankbase[13][offset] = data; }
+WRITE_HANDLER(mwh_bank14)   { if (offset & 0x30000000) return; cpu_bankbase[14][offset] = data; }
+WRITE_HANDLER(mwh_bank15)   { if (offset & 0x30000000) return; cpu_bankbase[15][offset] = data; }
+WRITE_HANDLER(mwh_bank16)   { if (offset & 0x30000000) return; cpu_bankbase[16][offset] = data; }
+
 static mem_write_handler bank_write_handler[] =
 {
-	mwh_ram,   mwh_bank1,  mwh_bank2,  mwh_bank3,  mwh_bank4,  mwh_bank5,  mwh_bank6,  mwh_bank7,
-	mwh_bank8, mwh_bank9,  mwh_bank10, mwh_bank11, mwh_bank12, mwh_bank13, mwh_bank14, mwh_bank15,
-	mwh_bank16
+    mwh_ram,   mwh_bank1,  mwh_bank2,  mwh_bank3,  mwh_bank4,  mwh_bank5,  mwh_bank6,  mwh_bank7,
+    mwh_bank8, mwh_bank9,  mwh_bank10, mwh_bank11, mwh_bank12, mwh_bank13, mwh_bank14, mwh_bank15,
+    mwh_bank16
 };
 
 WRITE_HANDLER(mwh_error)
 {
-	logerror("CPU #%d PC %04x: warning - write %02x to unmapped memory address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
-	cpu_bankbase[0][offset] = data;
+    logerror("CPU #%d PC %04x: warning - write %02x to unmapped memory address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+    if ((offset & 0xF0000000) == 0x30000000) return; // Prevent out-of-bounds pointer write crash
+    cpu_bankbase[0][offset] = data;
 }
 
 WRITE_HANDLER(mwh_error_sparse)
 {
-	logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory address %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+    logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory address %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
 }
 
 WRITE_HANDLER(mwh_error_sparse_bit)
 {
-	logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory bit addr %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset<<3);
+    logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory bit addr %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset<<3);
 }
 
 WRITE_HANDLER(mwh_rom)
 {
-	logerror("CPU #%d PC %04x: warning - write %02x to ROM address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+    logerror("CPU #%d PC %04x: warning - write %02x to ROM address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
 }
 
 WRITE_HANDLER(mwh_ramrom)
 {
-	cpu_bankbase[0][offset] = cpu_bankbase[0][offset + (OP_ROM - OP_RAM)] = data;
+    if ((offset & 0xF0000000) == 0x30000000) return;
+    cpu_bankbase[0][offset] = cpu_bankbase[0][offset + (OP_ROM - OP_RAM)] = data;
 }
 
 WRITE_HANDLER(mwh_nop)
