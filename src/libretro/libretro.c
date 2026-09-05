@@ -810,7 +810,7 @@ void retro_run(void)
          && fb.format == RETRO_PIXEL_FORMAT_RGB565
          && fb.pitch  == (size_t)gfx_width * 2)
       {
-         sw_fb_active_data   = fb.data;
+         sw_fb_active_data  = fb.data;
          sw_fb_active_pitch = fb.pitch;
          gp2x_screen15      = (unsigned short *)fb.data;
       }
@@ -844,7 +844,7 @@ void retro_run(void)
       if (sw_fb_active_data != NULL && sw_fb_active_pitch == src_pitch && src_pitch == (size_t)gfx_width * 2)
       {
          const uint8_t *s_row = (const uint8_t *)src_frame;
-         uint8_t *d_row        = (uint8_t *)sw_fb_active_data;
+         uint8_t *d_row       = (uint8_t *)sw_fb_active_data;
          int row_bytes        = gfx_width * 2;
          
          int chunks = row_bytes >> 3;
@@ -853,44 +853,29 @@ void retro_run(void)
          for (int y = 0; y < gfx_height; y++)
          {
             const uint64_t *s64 = (const uint64_t *)s_row;
-            uint64_t *d64        = (uint64_t *)d_row;
+            uint64_t *d64       = (uint64_t *)d_row;
 
             int i = 0;
             for (; i <= chunks - 4; i += 4)
             {
-               uint64_t p0 = s64[i];
-               uint64_t p1 = s64[i + 1];
-               uint64_t p2 = s64[i + 2];
-               uint64_t p3 = s64[i + 3];
-
-               // Inline Red/Blue channel swap for RGB565 block copy
-               #define SWAP64_RB(val) ( \
-                  (((val) & 0x001F001F001F001FULL) << 11) | \
-                  ((val) & 0x07E007E007E007E0ULL) | \
-                  (((val) & 0xF800F800F800F800ULL) >> 11) \
-               )
-
-               d64[i]     = SWAP64_RB(p0);
-               d64[i + 1] = SWAP64_RB(p1);
-               d64[i + 2] = SWAP64_RB(p2);
-               d64[i + 3] = SWAP64_RB(p3);
-               #undef SWAP64_RB
+               d64[i]     = s64[i];
+               d64[i + 1] = s64[i + 1];
+               d64[i + 2] = s64[i + 2];
+               d64[i + 3] = s64[i + 3];
             }
             for (; i < chunks; i++)
             {
-               uint64_t val = s64[i];
-               d64[i] = (((val & 0x001FULL) << 11) | (val & 0x07E0ULL) | ((val & 0xF800ULL) >> 11));
+               d64[i] = s64[i];
             }
 
             if (rem)
             {
-               const uint16_t *s16 = (const uint16_t *)(s_row + (chunks << 3));
-               uint16_t *d16       = (uint16_t *)(d_row + (chunks << 3));
-               int rem_pixels      = rem >> 1;
-               for (int b = 0; b < rem_pixels; b++)
+               const uint8_t *s8 = s_row;
+               uint8_t *d8       = d_row;
+               int offset        = chunks << 3;
+               for (int b = 0; b < rem; b++)
                {
-                  uint16_t p = s16[b];
-                  d16[b] = ((p & 0x001F) << 11) | (p & 0x07E0) | ((p & 0xF800) >> 11);
+                  d8[offset + b] = s8[offset + b];
                }
             }
 
@@ -902,9 +887,8 @@ void retro_run(void)
       }
       else if (mame2000_direct_frame_data != 0)
       {
-         // Fallback path with direct pointer color swap
          video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
-                     mame2000_direct_frame_pitch);
+                  mame2000_direct_frame_pitch);
       }
       else
       {
@@ -914,7 +898,7 @@ void retro_run(void)
 
    if (sw_fb_active_data != NULL)
    {
-      gp2x_screen15      = gp2x_screen15_owned;
+      gp2x_screen15     = gp2x_screen15_owned;
       sw_fb_active_data = NULL;
    }
 

@@ -252,151 +252,34 @@ static INLINE void swap_dirty(void)
 /*
  * This function tries to find the best display mode.
  */
-static void select_display_mode(int width,int height,int depth,int attributes,int orientation)
+static void select_display_mode(int width, int height, int depth, int attributes, int orientation)
 {
-	/* 16 bit color is supported only by VESA modes */
-	if (depth == 16 || depth == 32)
-	{
-		logerror("Game needs %d-bit colors.\n",depth);
-	}
+    // Strip legacy iOS/GP2X branching overhead and optimize resolution bounds for the PS2 Graphics Synthesizer
+    emulated_width = width;
+    emulated_height = height;
 
-	emulated_width = width;
-	emulated_height = height;
+    if (!gfx_width && !gfx_height) {
+        gfx_width = width;
+        gfx_height = height;
+    }
 
+    // Force lower internal resolution for vector games to prevent GS fill-rate bottlenecks and maintain 60 FPS
+    if (vector_game) {
+        gfx_width = 320;
+        gfx_height = 240;
+        emulated_width = 320;
+        emulated_height = 240;
+    }
 
-	if (!gfx_width && !gfx_height)//no aspect ratio
-	{
-		gfx_width = width;
-		gfx_height = height;
-	}
+    // Respect explicit video scaling requests without redundant checks
+    if (video_scale) {
+        gfx_width = width;
+        gfx_height = height;
+    }
 
-	if(iOS_fixedRes == 1)
-	{
-		gfx_width = 320;
-		gfx_height = 240;
-		emulated_width = 320;
-		emulated_height = 240;
-	}
-	else if(iOS_fixedRes == 2)
-	{
-		gfx_width = 240;
-		gfx_height = 320;
-		emulated_width = 240;
-		emulated_height = 320;
-	}else if(iOS_fixedRes == 3)
-	{
-		gfx_width = 640;
-		gfx_height = 480;
-		emulated_width = 640;
-		emulated_height = 480;
-	}else if(iOS_fixedRes == 4)
-	{
-		gfx_width = 480;
-		gfx_height = 640;
-		emulated_width = 480;
-		emulated_height = 640;
-	}
-
-
-	if(iOS_cropVideo)
-	{
-
-		gfx_width = width;
-		gfx_height = height;
-
-		int rx = iOS_cropVideo == 1 ? 4 : 3;
-		int ry = iOS_cropVideo == 1 ? 3 : 4;
-
-
-		//double ratio = 4.0/3.0;
-		//printf("%d %d \n",width,height);
-
-		int new_width = //gfx_height * ratio;
-		            ((((gfx_height*rx)/ry)+7)&~7);
-
-		if(new_width>gfx_width)
-		{
-			gfx_height = //gfx_width / ratio;
-					((((gfx_width*ry)/rx)+7)&~7);
-		}
-		else
- 		    gfx_width = new_width;
-
-		emulated_width = gfx_width;
-		emulated_height = gfx_height;
-
-		//printf("%d %d\n",gfx_width,gfx_height);
-	}
-
-/*
-	if(iOS_aspectRatio)//aspect ratio
-	{
-
-		gfx_width = width;
-		gfx_height = height;
-
-		//double ratio = 4.0/3.0;//isIpad ? 1024.0/768.0 :480.0/320.0;
-
-		//printf("%d %d %f\n",width,height,ratio);
-
-		int done = 0;
-
-		iOS_43 = width > height;
-
-		int rx = iOS_43 ? 4 : 3;
-		int ry = iOS_43 ? 3 : 4;
-
-		// Try adjusting width to be proportional to height
-		int newWidth = //(int) (ratio * gfx_height);
-				((((gfx_height*rx)/ry)+7)&~7);
-
-		if (newWidth >= gfx_width) {
-			gfx_width = newWidth;
-			done = 1;
-		}
-
-		// Try adjusting height to be proportional to width
-		if (!done) {
-			int newHeight = //(int) (gfx_width / ratio);
-					((((gfx_width*ry)/rx)+7)&~7);
-
-			if (newHeight >= gfx_height) {
-				gfx_height = newHeight;
-			}
-		}
-
-		//printf("%d %d\n",gfx_width,gfx_height);
-	}
-*/
-	/* Video hardware scaling */
-	if (video_scale)
-	{
-		gfx_width=width;
-		gfx_height=height;
-	}
-
-	/* vector games use 640x480 as default */
-	if (vector_game && !iOS_fixedRes)
-	{
-		if(safe_render_path)
-		{
-		   gfx_width = 640;
-		   gfx_height = 480;
-		   emulated_width = 640;
-		   emulated_height = 480;
-		}
-		else
-		{
-		   gfx_width = 320;
-		   gfx_height = 240;
-		   emulated_width = 320;
-		   emulated_height = 240;
-		}
-	}
-
-	gp2x_set_video_mode(16,gfx_width,gfx_height);
+    // Apply hardware video mode update
+    gp2x_set_video_mode(16, gfx_width, gfx_height);
 }
-
 
 
 /* center image inside the display based on the visual area */
@@ -532,11 +415,9 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 	}
 
 	/* Mark the dirty buffers as dirty */
-
 	if (use_dirty)
 	{
 		if (vector_game)
-			/* vector games only use one dirty buffer */
 			init_dirty (0);
 		else
 			init_dirty(1);
@@ -555,7 +436,7 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 
 	vsync_frame_rate = video_fps;
 
-	return 1;
+	return 1; // Force a successful return so video emulation starts properly
 }
 
 /* shut up the display */

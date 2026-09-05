@@ -38,7 +38,7 @@ int palette_transparent_color;
 #define PALETTE_COLOR_NEEDS_REMAP 0x80
 
 /* helper macro for 16-bit mode */
-#define rgbpenindex(r,g,b) ((Machine->scrbitmap->depth==16) ? ((((b)>>3)<<10)+(((g)>>3)<<5)+((r)>>3)) : ((((r)>>5)<<5)+(((g)>>5)<<2)+((b)>>6)))
+#define rgbpenindex(r,g,b) ((Machine->scrbitmap->depth==16) ? ((((r)>>3)<<10)+(((g)>>3)<<5)+((b)>>3)) : ((((r)>>5)<<5)+(((g)>>5)<<2)+((b)>>6)))
 
 
 unsigned short *palette_shadow_table;
