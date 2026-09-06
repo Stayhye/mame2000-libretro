@@ -972,7 +972,7 @@ SOURCES_C += $(CORE_DIR)/src/drivers/mermaid.c
 
 SOURCES_C += $(CORE_DIR)/src/drivers/magix.c
 
-SOURCES_C += $(CORE_DIR)/src/driver_orig.c
+SOURCES_C += $(CORE_DIR)/src/driver.c
 
 # List of sound cores
 
