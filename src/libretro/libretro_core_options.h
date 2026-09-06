@@ -176,7 +176,7 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
          { "96000",  NULL },
          { NULL, NULL },
       },
-      "22050"
+      "44100"
    },
    {
       "mame2000-stereo",
@@ -192,7 +192,7 @@ static struct retro_core_option_v2_definition option_defs_us[] = {
          { "disabled", NULL },
          { NULL, NULL },
       },
-      "enabled"
+      "disabled"
    },
    {
       "mame2000-qsound_output_filter",
