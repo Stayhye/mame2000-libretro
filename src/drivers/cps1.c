@@ -4045,37 +4045,6 @@ ROM_START( ffight )
 	ROM_LOAD( "ff19-19.bin",  0x20000, 0x20000, 0x1ef137f9 )
 ROM_END
 
-ROM_START( ffightae )
-    ROM_REGION( CODE_SIZE, REGION_CPU1 )      /* 68000 code */
-    ROM_LOAD_WIDE_SWAP( "ff-23m.8h", 0x00000, 0x80000, 0x86def74f )
-    ROM_LOAD_WIDE_SWAP( "ff-22m.7h", 0x80000, 0x80000, 0xcbdd8689 )
-
-    ROM_REGION( 0x200000, REGION_GFX1 | REGIONFLAG_DISPOSE )
-    ROM_LOAD( "ff-5m.7a", 0x000000, 0x80000, 0x91a909bd )
-    ROM_LOAD( "ff-7m.9a", 0x080000, 0x80000, 0x89f8b4cd )
-    ROM_LOAD( "ff-1m.3a", 0x100000, 0x80000, 0xd5469303 )
-    ROM_LOAD( "ff-3m.5a", 0x180000, 0x80000, 0x0c6302bf )
-
-    ROM_REGION( 0x18000, REGION_CPU2 ) /* 64k for the audio CPU (+banks) */
-    ROM_LOAD( "ff_09.12b", 0x00000, 0x08000, 0xb8367eb5 )
-    ROM_CONTINUE(          0x10000, 0x08000 )
-
-    ROM_REGION( 0x40000, REGION_SOUND1 )    /* Samples */
-    ROM_LOAD( "ff_18.11c", 0x00000, 0x20000, 0x375c66e7 )
-    ROM_LOAD( "ff_19.12c", 0x20000, 0x20000, 0x1ef137f9 )
-
-    ROM_REGION( 0x0200, REGION_USER1 )
-    ROM_LOAD( "buf1",      0x0000, 0x0117, 0xeb122de7 )
-    ROM_LOAD( "ioa1",      0x0000, 0x0117, 0x59c7ee3b )
-    ROM_LOAD( "prg1",      0x0000, 0x0117, 0xf1129744 )
-    ROM_LOAD( "rom1",      0x0000, 0x0117, 0x41dc73b9 )
-    ROM_LOAD( "sou1",      0x0000, 0x0117, 0x84f4b2fe )
-
-    ROM_REGION( 0x0200, REGION_USER2 )
-    ROM_LOAD( "s224bn.1a", 0x0000, 0x0117, 0x31367e94 ) /* GAL16V8 */
-    ROM_LOAD( "iob1.11e",  0x0000, 0x0117, 0x3abc0700 )
-ROM_END
-
 ROM_START( ffightu )
 	ROM_REGION( CODE_SIZE, REGION_CPU1 )      /* 68000 code */
 	ROM_LOAD_EVEN( "36",           0x00000, 0x20000, 0xe2a48af9 )

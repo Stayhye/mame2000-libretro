@@ -415,7 +415,7 @@ struct GameDriver
 	const struct IODevice *dev;
 #endif
 
-	uint32_t flags;	/* orientation and other flags; see defines below */
+	UINT32 flags;	/* orientation and other flags; see defines below */
 };
 
 

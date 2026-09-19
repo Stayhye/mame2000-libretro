@@ -15,7 +15,7 @@ static int cps2_width;
 
 int cps2_gfx_start(void)
 {
-	uint32_t dwval;
+	UINT32 dwval;
     int size=memory_region_length(REGION_GFX1);
     unsigned char *data = memory_region(REGION_GFX1);
 	int i,j,nchar,penusage,gfxsize;
@@ -27,7 +27,7 @@ int cps2_gfx_start(void)
     cps1_max_tile16=(gfxsize/4)/8;
     cps1_max_tile32=(gfxsize/16)/8;
 
-	cps1_gfx=(uint32_t*)malloc(gfxsize*sizeof(uint32_t));
+	cps1_gfx=(UINT32*)malloc(gfxsize*sizeof(UINT32));
 	if (!cps1_gfx)
 	{
 		return -1;

@@ -17,7 +17,7 @@
 void setstat(void)
 {
 	int i;
-	uint8_t a;
+	UINT8 a;
 
 	I.STATUS &= ~ ST_P;
 
@@ -64,7 +64,7 @@ void getstat(void)
 */
 
 
-static const uint16_t right_shift_mask_table[17] =
+static const UINT16 right_shift_mask_table[17] =
 {
 	0xFFFF,
 	0x7FFF,
@@ -85,7 +85,7 @@ static const uint16_t right_shift_mask_table[17] =
 	0x0000
 };
 
-static const uint16_t inverted_right_shift_mask_table[17] =
+static const UINT16 inverted_right_shift_mask_table[17] =
 {
 	0x0000,
 	0x8000,
@@ -106,12 +106,12 @@ static const uint16_t inverted_right_shift_mask_table[17] =
 	0xFFFF
 };
 
-static INLINE uint16_t logical_right_shift(uint16_t val, int c)
+static INLINE UINT16 logical_right_shift(UINT16 val, int c)
 {
 	return((val>>c) & right_shift_mask_table[c]);
 }
 
-static INLINE int16_t arithmetic_right_shift(int16_t val, int c)
+static INLINE INT16 arithmetic_right_shift(INT16 val, int c)
 {
 	if (val < 0)
 		return((val>>c) | inverted_right_shift_mask_table[c]);
@@ -126,7 +126,7 @@ static INLINE int16_t arithmetic_right_shift(int16_t val, int c)
 /*
 	Set lae
 */
-static INLINE void setst_lae(int16_t val)
+static INLINE void setst_lae(INT16 val)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E);
 
@@ -142,7 +142,7 @@ static INLINE void setst_lae(int16_t val)
 /*
 	Set laep (BYTE)
 */
-static INLINE void setst_byte_laep(int8_t val)
+static INLINE void setst_byte_laep(INT8 val)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E);
 
@@ -159,7 +159,7 @@ static INLINE void setst_byte_laep(int8_t val)
 /*
 	For COC, CZC, and TB
 */
-static INLINE void setst_e(uint16_t val, uint16_t to)
+static INLINE void setst_e(UINT16 val, UINT16 to)
 {
 	if (val == to)
 		I.STATUS |= ST_E;
@@ -170,7 +170,7 @@ static INLINE void setst_e(uint16_t val, uint16_t to)
 /*
 	For CI, C, CB
 */
-static INLINE void setst_c_lae(uint16_t to, uint16_t val)
+static INLINE void setst_c_lae(UINT16 to, UINT16 val)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E);
 
@@ -178,9 +178,9 @@ static INLINE void setst_c_lae(uint16_t to, uint16_t val)
 		I.STATUS |= ST_E;
 	else
 	{
-		if ( ((int16_t) val) > ((int16_t) to) )
+		if ( ((INT16) val) > ((INT16) to) )
 			I.STATUS |= ST_A;
-		if ( ((uint16_t) val) > ((uint16_t) to) )
+		if ( ((UINT16) val) > ((UINT16) to) )
 		I.STATUS |= ST_L;
 	}
 }
@@ -197,7 +197,7 @@ static INLINE void setst_c_lae(uint16_t to, uint16_t val)
 // a -> r3, b -> r4, st -> r5
 // preserve r6-r12
 
-static int32_t asm setst_add_32_laeco(register int32_t a, register int32_t b, register int16_t st)
+static INT32 asm setst_add_32_laeco(register INT32 a, register INT32 b, register INT16 st)
 {
   addco. r3, b, a   // add, set CR0, and set CA and OV
   clrlwi st, st, 21 // clear L, A, E, C, O flags (-> keep bits 21-31)
@@ -231,7 +231,7 @@ nocarry:
 // a -> r3, b -> r4, st -> r5
 // preserve r6-r12
 
-static int32_t asm setst_sub_32_laeco(register int32_t a, register int32_t b, register int16_t st)
+static INT32 asm setst_sub_32_laeco(register INT32 a, register INT32 b, register INT16 st)
 {
   subco. r3, a, b   // sub, set CR0, and set CA and OV
   clrlwi st, st, 21 // clear L, A, E, C, O flags (-> keep bits 21-31)
@@ -261,7 +261,7 @@ nocarry:
 //
 // Set laeco for add
 //
-static int16_t asm setst_add_laeco(register int16_t a, register int16_t b)
+static INT16 asm setst_add_laeco(register INT16 a, register INT16 b)
 { // a -> r3, b -> r4
   lwz r6, I(RTOC)   // load pointer to I
 
@@ -283,7 +283,7 @@ static int16_t asm setst_add_laeco(register int16_t a, register int16_t b)
 //
 //  Set laeco for subtract
 //
-static int16_t asm setst_sub_laeco(register int16_t a, register int16_t b)
+static INT16 asm setst_sub_laeco(register INT16 a, register INT16 b)
 {
   lwz r6, I(RTOC)
 
@@ -305,7 +305,7 @@ static int16_t asm setst_sub_laeco(register int16_t a, register int16_t b)
 //
 // Set laecop for add (BYTE)
 //
-static int8_t asm setst_addbyte_laecop(register int8_t a, register int8_t b)
+static INT8 asm setst_addbyte_laecop(register INT8 a, register INT8 b)
 { // a -> r3, b -> r4
   lwz r6, I(RTOC)   // load pointer to I
 
@@ -328,7 +328,7 @@ static int8_t asm setst_addbyte_laecop(register int8_t a, register int8_t b)
 //
 // Set laecop for subtract (BYTE)
 //
-static int8_t asm setst_subbyte_laecop(register int8_t a, register int8_t b)
+static INT8 asm setst_subbyte_laecop(register INT8 a, register INT8 b)
 { // a -> r3, b -> r4
   lwz r6, I(RTOC)
 
@@ -355,10 +355,10 @@ static int8_t asm setst_subbyte_laecop(register int8_t a, register int8_t b)
 /*
 	Set laeco for add
 */
-static INLINE int16_t setst_add_laeco(int a, int b)
+static INLINE INT16 setst_add_laeco(int a, int b)
 {
-	uint32_t res;
-	int16_t res2;
+	UINT32 res;
+	INT16 res2;
 
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C | ST_O);
 
@@ -370,7 +370,7 @@ static INLINE int16_t setst_add_laeco(int a, int b)
 	if ((res ^ b) & (res ^ a) & 0x8000)
 		I.STATUS |= ST_O;
 
-	res2 = (int16_t) res;
+	res2 = (INT16) res;
 
 	if (res2 > 0)
 		I.STATUS |= ST_L | ST_A;
@@ -386,10 +386,10 @@ static INLINE int16_t setst_add_laeco(int a, int b)
 /*
 	Set laeco for subtract
 */
-static INLINE int16_t setst_sub_laeco(int a, int b)
+static INLINE INT16 setst_sub_laeco(int a, int b)
 {
-	uint32_t res;
-	int16_t res2;
+	UINT32 res;
+	INT16 res2;
 
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C | ST_O);
 
@@ -401,7 +401,7 @@ static INLINE int16_t setst_sub_laeco(int a, int b)
 	if ((a ^ b) & (a ^ res) & 0x8000)
 		I.STATUS |= ST_O;
 
-	res2 = (int16_t) res;
+	res2 = (INT16) res;
 
 	if (res2 > 0)
 		I.STATUS |= ST_L | ST_A;
@@ -417,10 +417,10 @@ static INLINE int16_t setst_sub_laeco(int a, int b)
 /*
 	Set laecop for add (BYTE)
 */
-static INLINE int8_t setst_addbyte_laecop(int a, int b)
+static INLINE INT8 setst_addbyte_laecop(int a, int b)
 {
 	unsigned int res;
-	int8_t res2;
+	INT8 res2;
 
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C | ST_O | ST_P);
 
@@ -431,7 +431,7 @@ static INLINE int8_t setst_addbyte_laecop(int a, int b)
 	if ((res ^ b) & (res ^ a) & 0x80)
 		I.STATUS |= ST_O;
 
-	res2 = (int8_t) res;
+	res2 = (INT8) res;
 
 	if (res2 > 0)
 		I.STATUS |= ST_L | ST_A;
@@ -449,10 +449,10 @@ static INLINE int8_t setst_addbyte_laecop(int a, int b)
 /*
 	Set laecop for subtract (BYTE)
 */
-static INLINE int8_t setst_subbyte_laecop(int a, int b)
+static INLINE INT8 setst_subbyte_laecop(int a, int b)
 {
 	unsigned int res;
-	int8_t res2;
+	INT8 res2;
 
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C | ST_O | ST_P);
 
@@ -463,7 +463,7 @@ static INLINE int8_t setst_subbyte_laecop(int a, int b)
 	if ((a ^ b) & (a ^ res) & 0x80)
 		I.STATUS |= ST_O;
 
-	res2 = (int8_t) res;
+	res2 = (INT8) res;
 
 	if (res2 > 0)
 		I.STATUS |= ST_L | ST_A;
@@ -484,7 +484,7 @@ static INLINE int8_t setst_subbyte_laecop(int a, int b)
 /*
 	For NEG
 */
-static INLINE void setst_laeo(int16_t val)
+static INLINE void setst_laeo(INT16 val)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_O);
 
@@ -493,7 +493,7 @@ static INLINE void setst_laeo(int16_t val)
 	else if (val < 0)
 	{
 	I.STATUS |= ST_L;
-	if (((uint16_t) val) == 0x8000)
+	if (((UINT16) val) == 0x8000)
 		I.STATUS |= ST_O;
 	}
 	else
@@ -505,7 +505,7 @@ static INLINE void setst_laeo(int16_t val)
 /*
 	Meat of SRA
 */
-static INLINE uint16_t setst_sra_laec(int16_t a, uint16_t c)
+static INLINE UINT16 setst_sra_laec(INT16 a, UINT16 c)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C);
 
@@ -531,7 +531,7 @@ static INLINE uint16_t setst_sra_laec(int16_t a, uint16_t c)
 /*
 	Meat of SRL.  Same algorithm as SRA, except that we fills in with 0s.
 */
-static INLINE uint16_t setst_srl_laec(uint16_t a,uint16_t c)
+static INLINE UINT16 setst_srl_laec(UINT16 a,UINT16 c)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C);
 
@@ -543,9 +543,9 @@ static INLINE uint16_t setst_srl_laec(uint16_t a,uint16_t c)
 		a = logical_right_shift(a, 1);
 	}
 
-	if (((int16_t) a) > 0)
+	if (((INT16) a) > 0)
 		I.STATUS |= ST_L | ST_A;
-	else if (((int16_t) a) < 0)
+	else if (((INT16) a) < 0)
 		I.STATUS |= ST_L;
 	else
 		I.STATUS |= ST_E;
@@ -557,7 +557,7 @@ static INLINE uint16_t setst_srl_laec(uint16_t a,uint16_t c)
 //
 // Meat of SRC
 //
-static INLINE uint16_t setst_src_laec(uint16_t a,uint16_t c)
+static INLINE UINT16 setst_src_laec(UINT16 a,UINT16 c)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C);
 
@@ -568,9 +568,9 @@ static INLINE uint16_t setst_src_laec(uint16_t a,uint16_t c)
 			I.STATUS |= ST_C;
 	}
 
-	if (((int16_t) a) > 0)
+	if (((INT16) a) > 0)
 		I.STATUS |= ST_L | ST_A;
-	else if (((int16_t) a) < 0)
+	else if (((INT16) a) < 0)
 		I.STATUS |= ST_L;
 	else
 		I.STATUS |= ST_E;
@@ -582,15 +582,15 @@ static INLINE uint16_t setst_src_laec(uint16_t a,uint16_t c)
 //
 // Meat of SLA
 //
-static INLINE uint16_t setst_sla_laeco(uint16_t a, uint16_t c)
+static INLINE UINT16 setst_sla_laeco(UINT16 a, UINT16 c)
 {
 	I.STATUS &= ~ (ST_L | ST_A | ST_E | ST_C | ST_O);
 
 	if (c != 0)
 	{
 		{
-			register uint16_t mask;
-			register uint16_t ousted_bits;
+			register UINT16 mask;
+			register UINT16 ousted_bits;
 
 			mask = 0xFFFF << (16-c-1);
 			ousted_bits = a & mask;
@@ -607,9 +607,9 @@ static INLINE uint16_t setst_sla_laeco(uint16_t a, uint16_t c)
 		a <<= 1;
 	}
 
-	if (((int16_t) a) > 0)
+	if (((INT16) a) > 0)
 		I.STATUS |= ST_L | ST_A;
-	else if (((int16_t) a) < 0)
+	else if (((INT16) a) < 0)
 		I.STATUS |= ST_L;
 	else
 		I.STATUS |= ST_E;

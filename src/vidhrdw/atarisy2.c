@@ -56,7 +56,7 @@ struct pf_overrender_data
  *
  *************************************/
 
-uint8_t *atarisys2_slapstic;
+UINT8 *atarisys2_slapstic;
 
 
 
@@ -66,13 +66,13 @@ uint8_t *atarisys2_slapstic;
  *
  *************************************/
 
-static uint8_t *playfieldram;
-static uint8_t *alpharam;
+static UINT8 *playfieldram;
+static UINT8 *alpharam;
 
-static uint8_t videobank;
+static UINT8 videobank;
 
 static struct atarigen_pf_state pf_state;
-static uint16_t latched_vscroll;
+static UINT16 latched_vscroll;
 
 
 
@@ -86,7 +86,7 @@ static void pf_render_callback(const struct rectangle *clip, const struct rectan
 static void pf_check_overrender_callback(const struct rectangle *clip, const struct rectangle *tiles, const struct atarigen_pf_state *state, void *data);
 static void pf_overrender_callback(const struct rectangle *clip, const struct rectangle *tiles, const struct atarigen_pf_state *state, void *data);
 
-static void mo_render_callback(const uint16_t *data, const struct rectangle *clip, void *param);
+static void mo_render_callback(const UINT16 *data, const struct rectangle *clip, void *param);
 
 
 
@@ -115,7 +115,7 @@ int atarisys2_vh_start(void)
 	};
 
 	/* allocate banked memory */
-	alpharam = (uint8_t*)calloc(0x8000, 1);
+	alpharam = (UINT8*)calloc(0x8000, 1);
 	if (!alpharam)
 		return 1;
 
@@ -134,7 +134,7 @@ int atarisys2_vh_start(void)
 	if (palette_used_colors)
 	{
 		int i;
-		memset(palette_used_colors, PALETTE_COLOR_USED, Machine->drv->total_colors * sizeof(uint8_t));
+		memset(palette_used_colors, PALETTE_COLOR_USED, Machine->drv->total_colors * sizeof(UINT8));
 		for (i = 0; i < 4; i++)
 			palette_used_colors[15 + i * 16] = PALETTE_COLOR_TRANSPARENT;
 		for (i = 0; i < 8; i++)
@@ -530,7 +530,7 @@ static void pf_overrender_callback(const struct rectangle *clip, const struct re
  *
  *************************************/
 
-static void mo_render_callback(const uint16_t *data, const struct rectangle *clip, void *param)
+static void mo_render_callback(const UINT16 *data, const struct rectangle *clip, void *param)
 {
 	struct GfxElement *gfx = Machine->gfx[1];
 	struct mo_data *modata = (struct mo_data *)param;

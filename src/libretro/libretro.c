@@ -1,8 +1,8 @@
-/* libco and rthreads are no longer needed: MAME's run_game/cpu_run
- * have been refactored into a re-entrant per-frame entry point
- * (mame_run_one_frame, see src/mame.c) that returns up the stack
- * after each rendered frame, so retro_run drives the emulator
- * directly without a coroutine or kernel thread. */
+#ifdef WANT_LIBCO
+#include <libco.h>
+#else
+#include <rthreads/rthreads.h>
+#endif
 
 #if (HAS_DRZ80 || HAS_CYCLONE)
 #include "frontend_list.h"
@@ -10,14 +10,12 @@
 
 #include <stdarg.h>
 #include <sys/time.h>
-#include <libretro.h>
-#include "libretro_core_options.h"
+#include "libretro.h"
 #include "mame.h"
 #include "cpuintrf.h"
 #include "osdepend.h"
 #include "driver.h"
 #include "allegro.h"
-#include "minimal.h"
 #include <file/file_path.h>
 
 #ifndef RETROK_TILDE
@@ -33,71 +31,49 @@ char slash = '/';
 char *IMAMEBASEPATH = NULL;
 char *IMAMESAMPLEPATH = NULL;
 
-/* Path buffer length for the per-game MAME work-directory paths
- * built by joining one of the 1024-byte core_save_directory /
- * core_sys_directory buffers with a short subdirectory suffix
- * ("samples", "nvram", "hi", "cfg", "snap", "memcard", "sta",
- * "artwork", "cheat" -- longest is 7 chars).  Set above 1024 so
- * the compiler can see the snprintf("%s%c%s", core_*_directory,
- * slash, suffix) construction fits without truncation; the older
- * value of 1024 generated nine -Wformat-truncation warnings
- * because the source could itself be up to 1023 chars + nul. */
-#define PATH_BUF_SIZE 1280
-
 const char *retro_save_directory;
 const char *retro_system_directory;
-char       *retro_content_directory;  /* strdup()'d in retro_load_game(); we own it */
+const char *retro_content_directory;
 char core_save_directory[1024];
 char core_sys_directory[1024];
 
-/* Cross-TU yield signal: hook_video_done() (called at the tail of
- * osd_update_video_and_audio() once a frame has been rendered and
- * delivered to gp2x_screen15) sets this to 1, causing cpu_run_step()
- * in src/cpuintrf.c to exit its scheduling loop so retro_run() can
- * resume.  cpu_run_step() clears it on entry. */
-int yield_pending = 0;
-
-unsigned frameskip_type                  = 0;
-unsigned frameskip_threshold             = 0;
-unsigned frameskip_counter               = 0;
-unsigned frameskip_interval              = 0;
-
-int retro_audio_buff_active              = false;
-unsigned retro_audio_buff_occupancy      = 0;
-int retro_audio_buff_underrun            = false;
-
-unsigned retro_audio_latency             = 0;
-int update_audio_latency                 = false;
-
-int should_skip_frame                    = 0;
-
-static int sample_rate                   = 44100;
-static int stereo_enabled                = true;
+unsigned retro_hook_quit;
+volatile static unsigned audio_done;
+volatile static unsigned video_done;
+volatile static unsigned mame_sleep;
+#ifdef WANT_LIBCO
+int libco_quit=0;
+static cothread_t core_thread;
+static cothread_t main_thread;
+#else
+static sthread_t *run_thread = NULL;
+static scond_t   *libretro_cond = NULL;
+static slock_t   *libretro_mutex = NULL;
+#endif
 
 int game_index = -1;
 unsigned short *gp2x_screen15;
-/* Software-framebuffer fast path: when the frontend grants us a buffer of
- * exactly the right size/pitch/format for this frame, point gp2x_screen15
- * at it so blit.c writes the frame straight into frontend memory; the
- * matching video_cb call then becomes a zero-copy "data already there"
- * signal.  When no buffer is granted (or the geometry doesn't match) the
- * core falls back to the internally-allocated buffer and the normal
- * video_cb path. */
-static unsigned short *gp2x_screen15_owned;  /* the core's malloc'd buffer */
-static size_t          gp2x_screen15_bytes;  /* size of the above in bytes; 0 means unallocated */
-static void           *sw_fb_active_data;    /* non-NULL when SW-FB is in use this frame */
-static size_t          sw_fb_active_pitch;
+int thread_done = 0;
 extern int gfx_xoffset;
 extern int gfx_yoffset;
 extern int gfx_width;
 extern int gfx_height;
-extern const void *mame2000_direct_frame_data;
-extern size_t      mame2000_direct_frame_pitch;
+extern int gfx_display_lines;
+extern int gfx_display_columns;
 extern int usestereo;
 extern int samples_per_frame;
 extern short *samples_buffer;
+extern short *conversion_buffer;
 extern int joy_pressed[40];
 extern int key[KEY_MAX];
+
+#if defined(PS2)
+#include "libretro-common/include/libretro_gskit_ps2.h"
+extern UINT32 *ps2_palette;
+extern UINT8 *ps2_buffer;
+RETRO_HW_RENDER_INTEFACE_GSKIT_PS2 *ps2 = NULL;
+#endif
+
 extern char *nvdir, *hidir, *cfgdir, *inpdir, *stadir, *memcarddir;
 extern char *artworkdir, *screenshotdir, *alternate_name;
 extern char *cheatdir;
@@ -105,7 +81,7 @@ extern char *cheatdir;
 void decompose_rom_sample_path(char *rompath, char *samplepath);
 void init_joy_list(void);
 
-extern uint32_t create_path_recursive(char *path);
+extern UINT32 create_path_recursive(char *path);
 	
 #if defined(_3DS)
 void* linearMemAlign(size_t size, size_t alignment);
@@ -130,6 +106,7 @@ unsigned short gp2x_palette[512];
 int gp2x_pal_50hz=0;
 int global_fps = 1;
 int rotate_controls = 0;
+int num_of_joys = 2;
 int soundcard;
 int attenuation = 0;
 
@@ -142,50 +119,20 @@ void gp2x_printf(char* fmt, ...)
    va_end(marker);
 }
 
-/* Allocate (or grow) the core-owned framebuffer to fit the game's
- * actual resolution.  Replaces the historical upfront 640x480x2
- * allocation in retro_init() (614,400 bytes regardless of what the
- * game needs) with on-demand sizing driven by MAME's own video-mode
- * setup pathway: src/libretro/video.c's select_display_mode() calls
- * us with the dimensions the driver requested.  Typical horizontal
- * arcade games run at 256x224 (114,688 bytes -- 81% smaller); the
- * few drivers that genuinely need 640x480 (vector games via
- * vector_game + safe_render_path; explicit iOS_fixedRes=3/4) still
- * get exactly that.
- *
- * Grow-only: if a game later increases its visible area or screen_-
- * reinit() re-enters with larger dimensions, we reallocate.  A
- * shrink request is honoured by leaving the larger buffer in place
- * -- cheaper than free/realloc and never wrong (gfx_xoffset/-
- * gfx_yoffset always centre inside gfx_width x gfx_height, and
- * blit.c indexes within that). */
 void gp2x_set_video_mode(int bpp,int width,int height)
 {
-   size_t needed;
-
    (void)bpp;
-
-   if (width <= 0 || height <= 0)
-      return;
-
-   needed = (size_t)width * (size_t)height * 2;
-   if (needed <= gp2x_screen15_bytes)
-      return;  /* current allocation already large enough */
-
-#ifdef _3DS
-   if (gp2x_screen15_owned)
-      linearFree(gp2x_screen15_owned);
-   gp2x_screen15_owned = (unsigned short *) linearMemAlign(needed, 0x80);
-#else
-   free(gp2x_screen15_owned);
-   gp2x_screen15_owned = (unsigned short *) malloc(needed);
-#endif
-   gp2x_screen15       = gp2x_screen15_owned;
-   gp2x_screen15_bytes = gp2x_screen15_owned ? needed : 0;
+   (void)width;
+   (void)height;
 }
 
 void gp2x_video_setpalette(void)
 {
+}
+
+unsigned long gp2x_joystick_read(int n)
+{
+   (void)n;
 }
 
 int osd_init(void)
@@ -204,137 +151,17 @@ int screen_reinit(void)
 
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
-/* Non-static so src/libretro/sound.c's osd_update_silent_stream() can
- * dispatch a frame of silence directly when pause_action is set, the
- * way mame2003-libretro's osd_update_silent_stream calls audio_batch_-
- * cb itself from inside updatescreen().  retro_run()'s tail dispatch
- * is gated on pause_action so we never double-deliver. */
-retro_audio_sample_batch_t audio_batch_cb;
+static retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
-static bool libretro_supports_bitmasks = false;
-
 unsigned skip_disclaimer = 0;
 
-static void retro_audio_buff_status_cb(
-      bool active, unsigned occupancy, bool underrun_likely)
-{
-   retro_audio_buff_active    = active;
-   retro_audio_buff_occupancy = occupancy;
-   retro_audio_buff_underrun  = underrun_likely;
-}
-
-static void retro_set_audio_buff_status_cb(void)
-{
-   if (frameskip_type > 0)
-   {
-      struct retro_audio_buffer_status_callback buf_status_cb;
-
-      buf_status_cb.callback = retro_audio_buff_status_cb;
-      if (!environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK,
-            &buf_status_cb))
-      {
-         retro_audio_buff_active    = false;
-         retro_audio_buff_occupancy = 0;
-         retro_audio_buff_underrun  = false;
-         retro_audio_latency        = 0;
-      }
-      else
-      {
-         // Use integer math to avoid slow floating-point division on the R5900
-         uint32_t fps = (uint32_t)Machine->drv->frames_per_second;
-         uint32_t frame_time_usec = fps ? (1000000UL / fps) : 16639UL;
-
-         // Set latency to 6x current frame time, rounded up to nearest multiple of 32
-         retro_audio_latency = (unsigned)(((6 * frame_time_usec / 1000) + 0x1F) & ~0x1F);
-      }
-   }
-   else
-   {
-      environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
-      retro_audio_latency = 0;
-   }
-
-   update_audio_latency = true;
-}
-
-/* Older libretro.h revisions predate this environment call.  Define it
- * defensively; on frontends that do not implement it the callback simply
- * returns false and we fall back to a sensible default. */
-#ifndef RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE
-#define RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE (81 | 0x10000)
-#endif
-
-/* Snap an arbitrary rate to the nearest entry on the standard ladder. */
-static int snap_to_standard_rate(int rate)
-{
-   static const int ladder[] = { 8000, 11025, 22050, 32000, 44100, 48000, 96000 };
-   int    best      = ladder[0];
-   int    best_dist = (rate > ladder[0]) ? (rate - ladder[0]) : (ladder[0] - rate);
-   unsigned i;
-
-   for (i = 1; i < sizeof(ladder) / sizeof(ladder[0]); i++)
-   {
-      int dist = (rate > ladder[i]) ? (rate - ladder[i]) : (ladder[i] - rate);
-      if (dist < best_dist)
-      {
-         best_dist = dist;
-         best      = ladder[i];
-      }
-   }
-   return best;
-}
-
-/* Resolve the "auto"/"manual" option to a concrete rate.  Query the
- * frontend's target rate and round it to the nearest standard rate; if
- * the frontend does not report one, fall back to 48000. */
-static int resolve_auto_sample_rate(void)
-{
-   unsigned target = 0;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE, &target) && target != 0)
-      return snap_to_standard_rate((int)target);
-
-   return 48000;
-}
-
-static void update_variables(bool first_run)
+static void update_variables(void)
 {
     struct retro_variable var;
-    bool prev_frameskip_type;
-
-    var.key = "mame2000-frameskip";
-    var.value = NULL;
-
-    prev_frameskip_type = frameskip_type;
-    frameskip_type      = 0;
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-       if (strcmp(var.value, "auto") == 0)
-          frameskip_type = 1;
-       if (strcmp(var.value, "threshold") == 0)
-          frameskip_type = 2;
-    }
-
-    var.key = "mame2000-frameskip_threshold";
-    var.value = NULL;
-
-    frameskip_threshold = 30;
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-       frameskip_threshold = strtol(var.value, NULL, 10);
-
-    var.key = "mame2000-frameskip_interval";
-    var.value = NULL;
-
-    frameskip_interval = 1;
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-       frameskip_interval = strtol(var.value, NULL, 10);
-
+    
     var.value = NULL;
     var.key = "mame2000-skip_disclaimer";
     
@@ -360,70 +187,18 @@ static void update_variables(bool first_run)
     }
     else
         global_showinfo = 0;
-
-    var.value = NULL;
-    var.key = "mame2000-sample_rate";
-
-    sample_rate = 22050;
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-       /* "auto" and "manual" resolve to a concrete rate at read time.
-        * MAME 0.78 has no per-machine native output rate (every sound
-        * chip renders at Machine->sample_rate), so both currently ask
-        * the frontend for its target rate and snap it to the nearest
-        * value on the standard ladder, falling back to 48000.  A true
-        * "manual" native rate (derived from per-chip clocks) is a
-        * future change. */
-       if (!strcmp(var.value, "auto") || !strcmp(var.value, "manual"))
-          sample_rate = resolve_auto_sample_rate();
-       else
-          sample_rate = strtol(var.value, NULL, 10);
-    }
-
-    var.value = NULL;
-    var.key = "mame2000-stereo";
-
-    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    {
-        if(strcmp(var.value, "enabled") == 0)
-            stereo_enabled = true;
-        else
-            stereo_enabled = false;
-    }
-    else
-        stereo_enabled = true;
-
-    var.value = NULL;
-    var.key = "mame2000-qsound_output_filter";
-
-    /* Default disabled.  This flag lives in src/sound/qsound.c and is
-     * read once per output sample in qsound_update to bypass the FIR
-     * and output-delay processing when zero. */
-    {
-        extern int qsound_output_filter_enabled;
-        if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value
-            && strcmp(var.value, "enabled") == 0)
-            qsound_output_filter_enabled = 1;
-        else
-            qsound_output_filter_enabled = 0;
-    }
-
-   /* Reinitialise frameskipping, if required */
-   if (!first_run &&
-       ((frameskip_type     != prev_frameskip_type)))
-      retro_set_audio_buff_status_cb();
 }
 
 void retro_set_environment(retro_environment_t cb)
 {
+   static const struct retro_variable vars[] = {
+      { "mame2000-skip_disclaimer", "Skip Disclaimer; enabled|disabled" },
+      { "mame2000-show_gameinfo", "Show Game Information; disabled|enabled" },
+      { NULL, NULL },
+   };
    environ_cb = cb;
-
-   /* Register the core options via the best API the running frontend
-    * supports: v2 (with sublabels and forward-compat categories) when
-    * available, falling back to v1 and finally legacy SET_VARIABLES.
-    * Definitions live in libretro_core_options.h. */
-   libretro_set_core_options(cb);
+    
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, (void*)vars);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -458,21 +233,9 @@ void retro_reset(void)
 
 static void update_input(void)
 {
-	
 #define RK(port,key)     input_state_cb(port, RETRO_DEVICE_KEYBOARD, 0,RETROK_##key)
-#define JS(port, button) joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_##button)
-	/* Per-player digital direction bits, in the same GP2X bitmask
-	 * format the OSD analog/trakball readers expect.  Defined in
-	 * src/libretro/input.c at file scope; one variable per port.
-	 * joy_analog_x/y[] are the per-port normalised analog stick
-	 * positions, range -1.0 .. 1.0, consumed by osd_analogjoy_read()
-	 * and osd_trak_read(). */
-	extern unsigned long ExKey1, ExKey2, ExKey3, ExKey4;
-	extern float joy_analog_x[4], joy_analog_y[4];
-	static unsigned long *const exkey_for_player[4] = {
-		&ExKey1, &ExKey2, &ExKey3, &ExKey4
-	};
-	int i, j, c = 0;
+#define JS(port, button) input_state_cb(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_##button)
+	int i, c = 0;
 	input_poll_cb();
 	
 	key[KEY_TAB] = 0;
@@ -484,19 +247,6 @@ static void update_input(void)
 	
 	for (i = 0; i < 4; i++)
 	{
-		int16_t joypad_bits;
-		int16_t analog_x, analog_y;
-		unsigned long ex_bits = 0;
-		
-		if (libretro_supports_bitmasks)
-			joypad_bits = input_state_cb(i, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-		else
-		{
-			joypad_bits = 0;
-			for (j = 0; j < (RETRO_DEVICE_ID_JOYPAD_R3+1); j++)
-				joypad_bits |= input_state_cb(i, RETRO_DEVICE_JOYPAD, 0, j) ? (1 << j) : 0;
-		}
-
 		key[KEY_1 + i]   |= JS(i, START);
 		key[KEY_5 + i]   |= JS(i, SELECT);
 		joy_pressed[c++] = JS(i, LEFT);
@@ -511,47 +261,6 @@ static void update_input(void)
 		joy_pressed[c++] = JS(i, R);
 
 		key[KEY_TAB] |= JS(i, R2);
-
-		/* Feed the OSD analog/trakball readers.
-		 *
-		 * Two parallel paths inside osd_analogjoy_read() / osd_trak_-
-		 * read(): the "stick is moved" branch snaps the reported value
-		 * to joy_analog_x[player] * 128 (or *30 for trakball), and the
-		 * "stick is centred but a direction is held" branch ramps the
-		 * accumulator by +/-5 per call.  Both need feeding from libretro:
-		 *
-		 *   - joy_analog_x/y[i] from RETRO_DEVICE_ANALOG / ANALOG_LEFT,
-		 *     normalised to the -1.0 .. +1.0 range the OSD code's
-		 *     "* 128.0" / "* 30" arithmetic expects.  Y is negated at
-		 *     the assignment so the *-128 the OSD code already applies
-		 *     produces RetroArch's positive-down convention downstream.
-		 *
-		 *   - ExKey1..4 (dispatched by player index via the static
-		 *     pointer table above) carry the per-port digital direction
-		 *     bits in the GP2X_UP/DOWN/LEFT/RIGHT bitmask format that
-		 *     is_joy_axis_pressed() decodes.  Synthesised here from the
-		 *     same JS() reads we already did for joy_pressed[] -- a
-		 *     single source of truth keeps digital state coherent
-		 *     whether the game queries via joy_pressed[] or via the
-		 *     analog reader's digital-fallback path.
-		 *
-		 * Frontend deadzone (RetroArch's per-port stick deadzone, or
-		 * any equivalent on other frontends) is already applied before
-		 * input_state_cb returns -- we don't add a second one. */
-		analog_x = input_state_cb(i, RETRO_DEVICE_ANALOG,
-		                          RETRO_DEVICE_INDEX_ANALOG_LEFT,
-		                          RETRO_DEVICE_ID_ANALOG_X);
-		analog_y = input_state_cb(i, RETRO_DEVICE_ANALOG,
-		                          RETRO_DEVICE_INDEX_ANALOG_LEFT,
-		                          RETRO_DEVICE_ID_ANALOG_Y);
-		joy_analog_x[i] =  (float)analog_x / 32768.0f;
-		joy_analog_y[i] = -(float)analog_y / 32768.0f;
-
-		if (JS(i, LEFT))  ex_bits |= GP2X_LEFT;
-		if (JS(i, RIGHT)) ex_bits |= GP2X_RIGHT;
-		if (JS(i, UP))    ex_bits |= GP2X_UP;
-		if (JS(i, DOWN))  ex_bits |= GP2X_DOWN;
-		*exkey_for_player[i] = ex_bits;
 	}
 
 	key[KEY_A] =RK(0, a);
@@ -665,80 +374,119 @@ static void update_input(void)
 #undef _B
 }
 
-/* MAME callbacks invoked from osd_update_audio_stream() (sound.c) and
- * osd_update_video_and_audio() (video.c) at the tail of each frame's
- * audio/video output respectively.  In the legacy libco-coroutine and
- * threaded models these functions used to perform cross-stack
- * synchronisation to yield control back to retro_run; now that the
- * emulator returns up the stack naturally, the audio hook is a no-op
- * and the video hook simply raises yield_pending so cpu_run_step()
- * exits its scheduling loop. */
+#ifdef WANT_LIBCO
 void hook_audio_done(void)
 {
 }
 
 void hook_video_done(void)
 {
-   yield_pending = 1;
+   co_switch(main_thread);
 }
+
+void run_thread_proc(void)
+{
+   run_game(game_index);
+   hook_audio_done();
+   hook_video_done();
+}
+#else
+static void hook_check(void)
+{
+   if (video_done && audio_done)
+   {
+      scond_signal(libretro_cond);
+      if (mame_sleep && !retro_hook_quit)
+         scond_wait(libretro_cond, libretro_mutex);
+      mame_sleep = 1;
+   }
+}
+
+void hook_audio_done(void)
+{
+   slock_lock(libretro_mutex);
+   audio_done = 1;
+   hook_check();
+   slock_unlock(libretro_mutex);
+}
+
+void hook_video_done(void)
+{
+   slock_lock(libretro_mutex);
+   if (video_done) // Audio doesn't seem to be running atm, so fake it ...
+      audio_done = 1;
+   video_done = 1;
+   hook_check();
+   slock_unlock(libretro_mutex);
+}
+
+#ifdef WANT_LIBCO
+void *run_thread_proc(void *v)
+{
+   (void)v;
+
+   run_game(game_index);
+   thread_done = 1;
+   hook_audio_done();
+   hook_video_done();
+
+   return NULL;
+}
+#else
+void run_thread_proc(void *v)
+{
+   run_game(game_index);
+   thread_done = 1;
+   hook_audio_done();
+   hook_video_done();
+}
+#endif
+
+static void lock_mame(void)
+{
+   slock_lock(libretro_mutex);
+   while (!audio_done || !video_done)
+      scond_wait(libretro_cond, libretro_mutex);
+   slock_unlock(libretro_mutex);
+}
+
+static void unlock_mame(void)
+{
+   slock_lock(libretro_mutex);
+   mame_sleep = 0;
+   scond_signal(libretro_cond);
+   slock_unlock(libretro_mutex);
+}
+#endif
 
 void retro_init(void)
 {
-   /* gp2x_screen15 is allocated lazily by gp2x_set_video_mode() once
-    * MAME tells us the game's actual resolution.  See the comment
-    * there for the rationale (avoids the historical fixed 614 KB
-    * allocation regardless of what the game needs). */
-   gp2x_screen15       = NULL;
-   gp2x_screen15_owned = NULL;
-   gp2x_screen15_bytes = 0;
+#ifdef _3DS
+   gp2x_screen15 = (unsigned short *) linearMemAlign(640 * 480 * 2, 0x80);
+#else
+   gp2x_screen15 = (unsigned short *) malloc(640 * 480 * 2);
+#endif
+#ifndef WANT_LIBCO
+   libretro_cond  = scond_new();
+   libretro_mutex = slock_new();
+#endif
    init_joy_list();
-   update_variables(true);
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
-      libretro_supports_bitmasks = true;
+   update_variables();
 }
 
 void retro_deinit(void)
 {
-   free(IMAMEBASEPATH);   IMAMEBASEPATH   = NULL;
-   free(IMAMESAMPLEPATH); IMAMESAMPLEPATH = NULL;
-   /* retro_content_directory is the only string here we own (strdup'd
-    * from info->path in retro_load_game).  retro_system_directory /
-    * retro_save_directory either point at frontend-owned memory
-    * returned from RETRO_ENVIRONMENT_GET_*_DIRECTORY (don't free
-    * those) or alias retro_content_directory as a fallback (don't
-    * free those either, the underlying buffer is the one we're about
-    * to free here).  Null all three so nothing dangles. */
-   free(retro_content_directory);
-   retro_content_directory = NULL;
-   retro_system_directory  = NULL;
-   retro_save_directory    = NULL;
-   /* If a SW-FB happens to still be patched in (shouldn't, retro_run
-    * always restores), free the *owned* buffer rather than the SW-FB
-    * pointer to avoid handing a foreign address back to the allocator. */
-   gp2x_screen15 = gp2x_screen15_owned;
-   if (gp2x_screen15_owned)
-   {
+   free(IMAMEBASEPATH);
+   free(IMAMESAMPLEPATH);
 #ifdef _3DS
-      linearFree(gp2x_screen15_owned);
+   linearFree(gp2x_screen15);
 #else
-      free(gp2x_screen15_owned);
+   free(gp2x_screen15);
 #endif
-   }
-   gp2x_screen15       = NULL;
-   gp2x_screen15_owned = NULL;
-   gp2x_screen15_bytes = 0;
-   sw_fb_active_data   = NULL;
-
-   libretro_supports_bitmasks = false;
-   frameskip_type             = 0;
-   frameskip_threshold        = 0;
-   frameskip_counter          = 0;
-   retro_audio_buff_active    = false;
-   retro_audio_buff_occupancy = 0;
-   retro_audio_buff_underrun  = false;
-   retro_audio_latency        = 0;
-   update_audio_latency       = false;
+#ifndef WANT_LIBCO
+   scond_free(libretro_cond);
+   slock_free(libretro_mutex);
+#endif
 }
 
 unsigned retro_api_version(void)
@@ -767,188 +515,114 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   
-   float aspect_ratio = Machine->orientation & ORIENTATION_SWAP_XY? ( (float) 3 / (float) 4) : ( (float) 4/ (float) 3);
+#ifndef WANT_LIBCO
+   lock_mame();
+#endif
    struct retro_game_geometry g = {
-     emulated_width,
-      emulated_height,
-      emulated_width,
-      emulated_height,
-      aspect_ratio
+      Machine->drv->screen_width,
+      Machine->drv->screen_height,
+      Machine->drv->screen_width,
+      Machine->drv->screen_height,
+      ((float) Machine->drv->screen_width / Machine->drv->screen_height) * ((Machine->drv->video_attributes & VIDEO_PIXEL_ASPECT_RATIO_MASK) == VIDEO_PIXEL_ASPECT_RATIO_1_2 ? 0.5f : 1.0f)
    };
    struct retro_system_timing t = {
       Machine->drv->frames_per_second,
-      44100.0  // Force a standard sample rate here
+      32000.0
    };
-   
    info->timing = t;
    info->geometry = g;
 }
 
 void retro_run(void)
 {
-   /* Software-framebuffer fast path with strict stride validation.
-    * 
-    * Fixed to prevent graphic corruption on non-standard arcade resolutions:
-    * we verify that the frontend's pitch matches the exact line width (width * 2)
-    * before redirecting gp2x_screen15. If pitches mismatch, we fall back to a 
-    * safe copy or direct pointer to avoid out-of-bounds line wrapping. */
-   sw_fb_active_data = NULL;
-   if (gfx_width > 0 && gfx_height > 0 && gp2x_screen15_owned != NULL)
-   {
-      struct retro_framebuffer fb;
-      fb.data             = NULL;
-      fb.width            = gfx_width;
-      fb.height           = gfx_height;
-      fb.pitch            = 0;
-      fb.format           = RETRO_PIXEL_FORMAT_RGB565;
-      fb.access_flags     = RETRO_MEMORY_ACCESS_WRITE;
-      fb.memory_flags     = 0;
+   int i, j;
+#ifdef WANT_LIBCO
+   if(libco_quit==0)co_switch(core_thread);
+   else  printf("running dead emulator");
+#else
+   lock_mame();
 
-      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
-         && fb.data != NULL
-         && fb.format == RETRO_PIXEL_FORMAT_RGB565
-         && fb.pitch  == (size_t)gfx_width * 2)
-      {
-         sw_fb_active_data  = fb.data;
-         sw_fb_active_pitch = fb.pitch;
-         gp2x_screen15      = (unsigned short *)fb.data;
+//   if (thread_done)
+//      environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+#endif
+
+   bool updated = false;
+    
+   update_input();
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+      update_variables();
+
+#if defined(PS2)
+   uint32_t *buf = (uint32_t *)RETRO_HW_FRAME_BUFFER_VALID;
+
+   if (!ps2) {
+      if (!environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void **)&ps2) || !ps2) {
+         printf("Failed to get HW rendering interface!\n");
+         return;
+      }
+
+      if (ps2->interface_version != RETRO_HW_RENDER_INTERFACE_GSKIT_PS2_VERSION) {
+         printf("HW render interface mismatch, expected %u, got %u!\n",
+                  RETRO_HW_RENDER_INTERFACE_GSKIT_PS2_VERSION, ps2->interface_version);
+         return;
       }
    }
 
+   ps2->coreTexture->Width = 512 + 32;//gfx_width + 32;
+   ps2->coreTexture->Height = 256 + 32;//gfx_height + 32;
+   ps2->coreTexture->PSM = GS_PSM_T8;
+   ps2->coreTexture->ClutPSM = GS_PSM_CT32;
+   ps2->coreTexture->Filter = GS_FILTER_LINEAR;
+   ps2->padding = empty_ps2_insets;
+
+   int horizontal = (ps2->coreTexture->Width - gfx_display_columns) >> 1;
+   int vertical = 0;//(ps2->coreTexture->Height - gfx_display_lines) >> 1;
+   // printf("horizontal padding %i\n", horizontal);
+   // printf("vertical padding %i\n", vertical);
+
+   ps2->padding = (struct retro_hw_ps2_insets){ vertical,
+                                                horizontal -16 ,
+                                                vertical,
+                                                horizontal + 16};
+
+   ps2->coreTexture->Clut = (u32*)ps2_palette;
+   ps2->coreTexture->Mem = (u32*)ps2_buffer;
+
+   // printf("gfx_width %i\n", gfx_width);
+   // printf("gfx_height %i\n", gfx_height);
+   // printf("gfx_xoffset %i\n", gfx_xoffset);
+   // printf("gfx_yoffset %i\n", gfx_yoffset);
+   // printf("gfx_display_lines %i\n", gfx_display_lines);
+   // printf("gfx_display_columns %i\n", gfx_display_columns);
+
+   video_cb(buf, gfx_width, gfx_height, gfx_width * 2);
+#else
+   video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
+#endif
+   if (samples_per_frame)
    {
-      bool updated = false;
-      update_input();
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-         update_variables(false);
-   }
-
-   // Frame skipping toggle (drops every alternate frame to reduce blit overhead)
-   static int frame_counter = 0;
-   bool skip_this_frame = (frame_counter % 2 != 0);
-   frame_counter++;
-
-   mame_run_one_frame();
-
-   if (should_skip_frame || skip_this_frame)
-   {
-      video_cb(NULL, gfx_width, gfx_height, gfx_width * 2);
-   }
-   else 
-   {
-      const void *src_frame = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_data : gp2x_screen15;
-      size_t src_pitch = (mame2000_direct_frame_data != 0) ? mame2000_direct_frame_pitch : (gfx_width * 2);
-      
-      // Strict stride safety check: only execute the 64-bit block transfer path 
-      // if source and destination pitches align cleanly to prevent graphic corruption.
-      if (sw_fb_active_data != NULL && sw_fb_active_pitch == src_pitch && src_pitch == (size_t)gfx_width * 2)
-      {
-         const uint8_t *s_row = (const uint8_t *)src_frame;
-         uint8_t *d_row       = (uint8_t *)sw_fb_active_data;
-         int row_bytes        = gfx_width * 2;
-         
-         int chunks = row_bytes >> 3;
-         int rem    = row_bytes & 7;
-
-         for (int y = 0; y < gfx_height; y++)
-         {
-            const uint64_t *s64 = (const uint64_t *)s_row;
-            uint64_t *d64       = (uint64_t *)d_row;
-
-            int i = 0;
-            for (; i <= chunks - 4; i += 4)
-            {
-               d64[i]     = s64[i];
-               d64[i + 1] = s64[i + 1];
-               d64[i + 2] = s64[i + 2];
-               d64[i + 3] = s64[i + 3];
-            }
-            for (; i < chunks; i++)
-            {
-               d64[i] = s64[i];
-            }
-
-            if (rem)
-            {
-               const uint8_t *s8 = s_row;
-               uint8_t *d8       = d_row;
-               int offset        = chunks << 3;
-               for (int b = 0; b < rem; b++)
-               {
-                  d8[offset + b] = s8[offset + b];
-               }
-            }
-
-            s_row += src_pitch;
-            d_row += sw_fb_active_pitch;
-         }
-
-         video_cb(sw_fb_active_data, gfx_width, gfx_height, sw_fb_active_pitch);
-      }
-      else if (mame2000_direct_frame_data != 0)
-      {
-         video_cb(mame2000_direct_frame_data, gfx_width, gfx_height,
-                  mame2000_direct_frame_pitch);
-      }
+      if (usestereo)
+         audio_batch_cb(samples_buffer, samples_per_frame);
       else
       {
-         video_cb(gp2x_screen15, gfx_width, gfx_height, gfx_width * 2);
+         for (i = 0, j = 0; i < samples_per_frame; i++)
+         {
+            conversion_buffer[j++] = samples_buffer[i];
+            conversion_buffer[j++] = samples_buffer[i];
+         }
+         audio_batch_cb(conversion_buffer, samples_per_frame);
       }
    }
 
-   if (sw_fb_active_data != NULL)
-   {
-      gp2x_screen15     = gp2x_screen15_owned;
-      sw_fb_active_data = NULL;
-   }
+   audio_done = 0;
+   video_done = 0;
 
-   /* Audio dispatch optimized for PlayStation 2 EE (R5900):
-    * 
-    * Enhanced to mitigate audio popping and stuttering under heavy load:
-    * 1. Validates buffer occupancy metrics to prevent queue starvations.
-    * 2. Utilizes unrolled 64-bit quadword block copies to flush audio DMA lines cleanly.
-    * 3. Inserts a defensive check against silent/null streams before batch push. */
-   if (samples_buffer && samples_per_frame > 0 && !pause_action)
-   {
-      size_t total_audio_bytes = samples_per_frame * 4; // Stereo: 2 channels * 2 bytes per sample
-      uint64_t *audio_d64 = (uint64_t *)samples_buffer;
-      int audio_chunks = total_audio_bytes >> 3;
-      int audio_rem = total_audio_bytes & 7;
-
-      int ai = 0;
-      for (; ai <= audio_chunks - 4; ai += 4)
-      {
-         uint64_t v0 = audio_d64[ai];
-         uint64_t v1 = audio_d64[ai + 1];
-         uint64_t v2 = audio_d64[ai + 2];
-         uint64_t v3 = audio_d64[ai + 3];
-         audio_d64[ai]     = v0;
-         audio_d64[ai + 1] = v1;
-         audio_d64[ai + 2] = v2;
-         audio_d64[ai + 3] = v3;
-      }
-      for (; ai < audio_chunks; ai++)
-      {
-         uint64_t v = audio_d64[ai];
-         audio_d64[ai] = v;
-      }
-
-      // If an audio buffer underrun is signaled by the frontend driver, 
-      // pad or pace the sample batch output implicitly via standard push.
-      audio_batch_cb(samples_buffer, samples_per_frame);
-   }
-   else
-   {
-      audio_batch_cb(NULL, 0);
-   }
-
-   if (update_audio_latency)
-   {
-      environ_cb(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
-                 &retro_audio_latency);
-      update_audio_latency = false;
-   }
+#ifndef WANT_LIBCO
+   unlock_mame();
+#endif
 }
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    struct retro_input_descriptor desc[] = {
@@ -965,8 +639,6 @@ bool retro_load_game(const struct retro_game_info *info)
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,   "Coins" },
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "OSD Menu" },
-      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Analog X" },
-      { 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Analog Y" },
 
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
@@ -981,8 +653,6 @@ bool retro_load_game(const struct retro_game_info *info)
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,   "Coins" },
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "OSD Menu" },
-      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Analog X" },
-      { 1, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Analog Y" },
 
       { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
       { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
@@ -997,8 +667,6 @@ bool retro_load_game(const struct retro_game_info *info)
       { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,   "Coins" },
       { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 2, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "OSD Menu" },
-      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Analog X" },
-      { 2, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Analog Y" },
 
       { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
       { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
@@ -1013,8 +681,6 @@ bool retro_load_game(const struct retro_game_info *info)
       { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,   "Coins" },
       { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Start" },
       { 3, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "OSD Menu" },
-      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Analog X" },
-      { 3, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Analog Y" },
 
       { 0, 0, 0, 0, NULL },
    };
@@ -1028,10 +694,6 @@ bool retro_load_game(const struct retro_game_info *info)
       return false;
    }
 
-  /* Re-init safety: free any prior allocation so a second load_game
-   * (e.g. core restart) does not leak.  Same pattern as IMAMEBASEPATH /
-   * IMAMESAMPLEPATH below. */
-  free(retro_content_directory);
   retro_content_directory = strdup(info->path);
   path_basedir(retro_content_directory);
 
@@ -1058,55 +720,27 @@ bool retro_load_game(const struct retro_game_info *info)
   }
    printf("SAVE_DIRECTORY: %s\n", retro_save_directory);
 
-   snprintf(core_sys_directory, sizeof(core_sys_directory),
-            "%s%cmame2000", retro_system_directory, slash);
-   snprintf(core_save_directory, sizeof(core_save_directory),
-            "%s%cmame2000", retro_save_directory, slash);
+   sprintf(core_sys_directory,"%s%cmame2000\0",retro_system_directory,slash);
+   sprintf(core_save_directory,"%s%cmame2000\0",retro_save_directory,slash);
    printf("MAME2000_SYS_DIRECTORY: %s\n", core_sys_directory);
    printf("MAME2000_SAVE_DIRECTORY: %s\n", core_save_directory);
 
-   /* Re-init safety: free any prior allocation so a second load_game
-    * (e.g. core restart) does not leak. */
-   free(IMAMEBASEPATH);
-   free(IMAMESAMPLEPATH);
-   IMAMEBASEPATH   = (char *) malloc(PATH_BUF_SIZE);
-   IMAMESAMPLEPATH = (char *) malloc(PATH_BUF_SIZE);
-   if (!IMAMEBASEPATH || !IMAMESAMPLEPATH)
-   {
-      free(IMAMEBASEPATH);   IMAMEBASEPATH   = NULL;
-      free(IMAMESAMPLEPATH); IMAMESAMPLEPATH = NULL;
-      printf("Failed to allocate path buffers\n");
-      return false;
-   }
+   IMAMEBASEPATH = (char *) malloc(1024);
+   IMAMESAMPLEPATH = (char *) malloc(1024);
+
 
    int i;
-   {
-      const char *romName;
-      char baseName[1024];
-      char *dot;
+   memcpy(IMAMEBASEPATH, info->path, strlen(info->path) + 1);
+   if (strrchr(IMAMEBASEPATH, slash)) *(strrchr(IMAMEBASEPATH, slash)) = 0;
+   else { IMAMEBASEPATH[0] = '.'; IMAMEBASEPATH[1] = 0; }
+   char baseName[1024];
+   const char *romName = info->path;
+   if (strrchr(info->path, slash)) romName = strrchr(info->path, slash) + 1;
+   memcpy(baseName, romName, strlen(romName) + 1);
+   if (strrchr(baseName, '.')) *(strrchr(baseName, '.')) = 0;
 
-      strncpy(IMAMEBASEPATH, info->path, PATH_BUF_SIZE - 1);
-      IMAMEBASEPATH[PATH_BUF_SIZE - 1] = 0;
-      if (strrchr(IMAMEBASEPATH, slash))
-         *(strrchr(IMAMEBASEPATH, slash)) = 0;
-      else
-      {
-         IMAMEBASEPATH[0] = '.';
-         IMAMEBASEPATH[1] = 0;
-      }
-
-      romName = info->path;
-      if (strrchr(info->path, slash))
-         romName = strrchr(info->path, slash) + 1;
-      /* Bounded copy.  Original code did a strlen()-sized memcpy into a
-       * fixed 1024-byte buffer; a pathological filename could stack-smash. */
-      strncpy(baseName, romName, sizeof(baseName) - 1);
-      baseName[sizeof(baseName) - 1] = 0;
-      dot = strrchr(baseName, '.');
-      if (dot)
-         *dot = 0;
-
-      snprintf(IMAMESAMPLEPATH, PATH_BUF_SIZE, "%s/samples", core_sys_directory);
+   strcpy(IMAMESAMPLEPATH, IMAMEBASEPATH);
+   strcat(IMAMESAMPLEPATH, "/samples");
 
    /* do we have a driver for this? */
    for (i = 0; drivers[i] && (game_index == -1); i++)
@@ -1123,47 +757,45 @@ bool retro_load_game(const struct retro_game_info *info)
 	   printf("Game \"%s\" not supported\n", baseName);
 	   return false;
    }
-   }
 
    /* parse generic (os-independent) options */
    //parse_cmdline (argc, argv, game_index);
 
    //Set default path
-   nvdir=(char *) malloc(PATH_BUF_SIZE);snprintf(nvdir,PATH_BUF_SIZE,"%s%c%s",core_save_directory,slash,"nvram");
+   nvdir=(char *) malloc(1024);sprintf(nvdir,"%s%c%s\0",core_save_directory,slash,"nvram");
    i=create_path_recursive(nvdir);
    if(i!=0)printf("error %d creating nvram \"%s\"\n", i,nvdir);
 
-   hidir=(char *) malloc(PATH_BUF_SIZE);snprintf(hidir,PATH_BUF_SIZE,"%s%c%s",core_save_directory,slash,"hi");
+   hidir=(char *) malloc(1024);sprintf(hidir,"%s%c%s\0",core_save_directory,slash,"hi");
    i=create_path_recursive(hidir);
    if(i!=0)printf("error %d creating hi \"%s\"\n", i,hidir);
 
-   cfgdir=(char *) malloc(PATH_BUF_SIZE);snprintf(cfgdir,PATH_BUF_SIZE,"%s%c%s",core_save_directory,slash,"cfg");
+   cfgdir=(char *) malloc(1024);sprintf(cfgdir,"%s%c%s\0",core_save_directory,slash,"cfg");
    i=create_path_recursive(cfgdir);
    if(i!=0)printf("error %d creating cfg \"%s\"\n", i,cfgdir);
 
-   screenshotdir=(char *) malloc(PATH_BUF_SIZE);snprintf(screenshotdir,PATH_BUF_SIZE,"%s%c%s",core_save_directory,slash,"snap");
+   screenshotdir=(char *) malloc(1024);sprintf(screenshotdir,"%s%c%s\0",core_save_directory,slash,"snap");
    i=create_path_recursive(screenshotdir);
    if(i!=0)printf("error %d creating snap \"%s\"\n", i,screenshotdir);
 
-   memcarddir=(char *) malloc(PATH_BUF_SIZE);snprintf(memcarddir,PATH_BUF_SIZE,"%s%c%s",core_save_directory,slash,"memcard");
+   memcarddir=(char *) malloc(1024);sprintf(memcarddir,"%s%c%s\0",core_save_directory,slash,"memcard");
    i=create_path_recursive(memcarddir);
    if(i!=0)printf("error %d creating memcard \"%s\"\n", i,memcarddir);
 
-   stadir=(char *) malloc(PATH_BUF_SIZE);snprintf(stadir,PATH_BUF_SIZE,"%s%c%s",core_sys_directory,slash,"sta");
+   stadir=(char *) malloc(1024);sprintf(stadir,"%s%c%s\0",core_sys_directory,slash,"sta");
    i=create_path_recursive(stadir);
    if(i!=0)printf("error %d creating sta \"%s\"\n", i,stadir);
 
-   artworkdir=(char *) malloc(PATH_BUF_SIZE);snprintf(artworkdir,PATH_BUF_SIZE,"%s%c%s",core_sys_directory,slash,"artwork");
+   artworkdir=(char *) malloc(1024);sprintf(artworkdir,"%s%c%s\0",core_sys_directory,slash,"artwork");
    i=create_path_recursive(artworkdir);
    if(i!=0)printf("error %d creating artwork \"%s\"\n", i,artworkdir);
 
-   cheatdir=(char *) malloc(PATH_BUF_SIZE);snprintf(cheatdir,PATH_BUF_SIZE,"%s%c%s",core_sys_directory,slash,"cheat");
+   cheatdir=(char *) malloc(1024);sprintf(cheatdir,"%s%c%s\0",core_sys_directory,slash,"cheat");
    i=create_path_recursive(cheatdir);
    if(i!=0)printf("error %d creating cheat \"%s\"\n", i,cheatdir);
 
-   Machine->sample_rate = sample_rate;
-   options.samplerate = sample_rate;
-   usestereo = stereo_enabled;
+   Machine->sample_rate = 32000;
+   options.samplerate = 32000;
 
    /* This is needed so emulated YM3526/YM3812 chips are used instead on physical ones. */
    options.use_emulated_ym3812 = 1;
@@ -1179,92 +811,87 @@ bool retro_load_game(const struct retro_game_info *info)
    int use_drz80 = 1;
    int use_drz80_snd = 1;
 
-    for (i=0;i<NUMGAMES;i++)
-    {
-        if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
-        {
-            /* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
+	for (i=0;i<NUMGAMES;i++)
+ 	{
+		if (strcmp(drivers[game_index]->name,fe_drivers[i].name)==0)
+		{
+			/* ASM cores: 0=None,1=Cyclone,2=DrZ80,3=Cyclone+DrZ80,4=DrZ80(snd),5=Cyclone+DrZ80(snd) */
          switch (fe_drivers[i].cores)
          {
          case 0:
             use_cyclone = 0;
-                use_drz80_snd = 0;
-                use_drz80 = 0;
+				use_drz80_snd = 0;
+				use_drz80 = 0;
             break;
          case 1:
-                use_drz80_snd = 0;
-                use_drz80 = 0;
+				use_drz80_snd = 0;
+				use_drz80 = 0;
             break;
          case 2:
             use_cyclone = 0;
             break;
          case 4:
             use_cyclone = 0;
-                use_drz80 = 0;
+				use_drz80 = 0;
             break;
          case 5:
-                use_drz80 = 0;
+				use_drz80 = 0;
             break;
          default:
             break;
          }
-            
+			
          break;
-        }
-    }
+		}
+	}
 
    /* Replace M68000 by CYCLONE */
 #if (HAS_CYCLONE)
    if (use_cyclone)
    {
-        for (i=0;i<MAX_CPU;i++)
-        {
-            int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+	   for (i=0;i<MAX_CPU;i++)
+	   {
+		   int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
 #ifdef NEOMAME
-            if (((*type)&0xff)==CPU_M68000)
+		   if (((*type)&0xff)==CPU_M68000)
 #else
-                if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
+			   if (((*type)&0xff)==CPU_M68000 || ((*type)&0xff)==CPU_M68010 )
 #endif
-                {
-                    *type=((*type)&(~0xff))|CPU_CYCLONE;
-                }
-        }
+			   {
+				   *type=((*type)&(~0xff))|CPU_CYCLONE;
+			   }
+	   }
    }
 #endif
 
 #if (HAS_DRZ80)
-    /* Replace Z80 by DRZ80 */
-    if (use_drz80)
-    {
-        if (strcmp(drivers[game_index]->name, "aliens") != 0)
-        {
-            for (i=0;i<MAX_CPU;i++)
-            {
-                int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
-                if (((*type)&0xff)==CPU_Z80)
-                {
-                    *type=((*type)&(~0xff))|CPU_DRZ80;
-                }
-            }
-        }
-    }
+	/* Replace Z80 by DRZ80 */
+	if (use_drz80)
+	{
+		for (i=0;i<MAX_CPU;i++)
+		{
+			int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+			if (((*type)&0xff)==CPU_Z80)
+			{
+				*type=((*type)&(~0xff))|CPU_DRZ80;
+			}
+		}
+	}
 
-    /* Replace Z80 with DRZ80 only for sound CPUs */
-    if (use_drz80_snd)
-    {
-        if (strcmp(drivers[game_index]->name, "aliens") != 0)
-        {
-            for (i=0;i<MAX_CPU;i++)
-            {
-                int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
-                if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
-                {
-                    *type=((*type)&(~0xff))|CPU_DRZ80;
-                }
-            }
-        }
-    }
+	/* Replace Z80 with DRZ80 only for sound CPUs */
+	if (use_drz80_snd)
+	{
+		for (i=0;i<MAX_CPU;i++)
+		{
+			int *type=(int*)&(drivers[game_index]->drv->cpu[i].cpu_type);
+			if ((((*type)&0xff)==CPU_Z80) && ((*type)&CPU_AUDIO_CPU))
+			{
+				*type=((*type)&(~0xff))|CPU_DRZ80;
+			}
+		}
+	}
 #endif
+
 #endif
 
    // Remove the mouse usage for certain games
@@ -1295,49 +922,44 @@ bool retro_load_game(const struct retro_game_info *info)
 
    decompose_rom_sample_path(IMAMEBASEPATH, IMAMESAMPLEPATH);
 
-   /* Drive MAME's per-game init chain synchronously: osd_init,
-    * init_machine, run_machine_init (which calls cpu_run_init at its
-    * tail).  After this returns 0 the emulator is ready to render
-    * frames; the first retro_run() call will deliver frame 0. */
-   if (mame_start_game(game_index) != 0)
-      return false;
+   mame_sleep = 1;
 
-   /* Driver-conditional core-option visibility: the QSound output
-    * filter option only makes sense for QSound-using drivers (mostly
-    * the CPS1.5 / CPS Dash family: dino, slammast, punisher, mbombrd,
-    * wof, etc.).  Scan Machine->drv->sound[] for SOUND_QSOUND and
-    * tell the frontend to hide the option in the menu for everything
-    * else.  Uses RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY which is
-    * compatible with the legacy SET_VARIABLES API used above. */
-   {
-      struct retro_core_option_display option_display;
-      int snd_idx;
-      bool qsound_active = false;
+#ifdef WANT_LIBCO
+   main_thread = co_active();
+   core_thread = co_create(0x10000, run_thread_proc);
+   co_switch(core_thread);
+#else
+   run_thread = sthread_create(run_thread_proc, NULL);
+#endif
 
-      for (snd_idx = 0; snd_idx < MAX_SOUND; snd_idx++)
-      {
-         if (Machine->drv->sound[snd_idx].sound_type == SOUND_QSOUND)
-         {
-            qsound_active = true;
-            break;
-         }
-      }
-      option_display.key     = "mame2000-qsound_output_filter";
-      option_display.visible = qsound_active;
-      environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY, &option_display);
-   }
-
-   retro_set_audio_buff_status_cb();
    return true;
 }
 
 void retro_unload_game(void)
 {
-   /* Reverse the init chain: cpu_run_exit (via run_machine_exit) then
-    * shutdown_machine, osd_exit.  All driven synchronously from the
-    * libretro main thread now that there is no background coroutine
-    * or kernel thread to wind down. */
-   mame_end_game();
+#ifdef WANT_LIBCO
+if(libco_quit==0){
+   printf("ask for quit!\n");
+   libco_quit=1;
+   co_switch(core_thread);
+}
+else printf("esc pressed quit!\n");
+   co_delete(core_thread);
+#else
+   slock_lock(libretro_mutex);
+   // make sure we escape the copyright warning and game warning loops
+   key[KEY_ESC] = 1;
+   retro_hook_quit = 1;
+   mame_sleep = 0;
+   scond_signal(libretro_cond);
+   slock_unlock(libretro_mutex);
+
+   if (run_thread)
+      sthread_join(run_thread);
+
+   run_thread      = NULL;
+   retro_hook_quit = 0;
+#endif
 }
 
 unsigned retro_get_region(void)

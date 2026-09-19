@@ -59,7 +59,7 @@ static int segapcm_gaintable[] = {
 #endif
 
 
-static void SEGAPCMUpdate( int num, int16_t **buffer, int length );
+static void SEGAPCMUpdate( int num, INT16 **buffer, int length );
 
 
 /************************************************/
@@ -100,6 +100,8 @@ int SEGAPCMInit( const struct MachineSound *msound, int banksize, int mode, unsi
 	sample_shift = SEGAPCM_samples[mode][1];
 	pcm_rom = inpcm;
 
+	//printf( "segaPCM in\n" );
+
 	/**** interface init ****/
 	spcm.bankshift = banksize&0xffffff;
 	if( (banksize>>16) == 0x00 )
@@ -125,6 +127,7 @@ int SEGAPCMInit( const struct MachineSound *msound, int banksize, int mode, unsi
 		spcm.step[i] = (int)(((float)sample_rate / (float)emulation_rate) * (float)(0x80<<5));
 		spcm.pcmd[i] = 0;
 	}
+	//printf( "segaPCM work init end\n" );
 
 	{
 		char buf[LR_PAN][40];
@@ -138,6 +141,7 @@ int SEGAPCMInit( const struct MachineSound *msound, int banksize, int mode, unsi
 		vol[1] = (MIXER_PAN_RIGHT<<8) | (volume&0xff);
 		stream = stream_init_multi( LR_PAN, name, vol, rate, 0, SEGAPCMUpdate );
 	}
+	//printf( "segaPCM end\n" );
 	return 0;
 }
 
@@ -175,13 +179,13 @@ void SEGAPCMResetChip( void )
 
 static INLINE int ILimit(int v, int max, int min) { return v > max ? max : (v < min ? min : v); }
 
-static void SEGAPCMUpdate( int num, int16_t **buffer, int length )
+static void SEGAPCMUpdate( int num, INT16 **buffer, int length )
 {
 	int i, j;
 	unsigned int addr, old_addr, end_addr, end_check_addr;
 	unsigned char *pcm_buf;
 	int  lv, rv;
-	int16_t  *datap[2];
+	INT16  *datap[2];
 	int tmp;
 
 	if( Machine->sample_rate == 0 ) return;
@@ -190,8 +194,8 @@ static void SEGAPCMUpdate( int num, int16_t **buffer, int length )
 	datap[0] = buffer[0];
 	datap[1] = buffer[1];
 
-	memset( datap[0], 0x00, length * sizeof(int16_t) );
-	memset( datap[1], 0x00, length * sizeof(int16_t) );
+	memset( datap[0], 0x00, length * sizeof(INT16) );
+	memset( datap[1], 0x00, length * sizeof(INT16) );
 
 	for( i = 0; i < SEGAPCM_MAX; i++ )
 	{
@@ -334,6 +338,7 @@ remake_vol:
 			break;
 		/*
 		default:
+			printf( "unknown %d = %02x : %02x\n", channel, r, v );
 			break;
 		*/
 	}

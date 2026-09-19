@@ -82,13 +82,10 @@ void mexico86_vh_screenrefresh(struct osd_bitmap *bitmap,int full_refresh)
 if (offs >= mexico86_objectram_size && offs < mexico86_objectram_size+0x180) continue;
 if (offs >= mexico86_objectram_size+0x1c0) continue;
 
-		/* skip empty sprites - byte-by-byte zero check is endian- and
-		 * alignment-agnostic, and free vs. the original uint32_t cast
-		 * (which was UB by the C standard, and could fault on ARMv5). */
-		if (mexico86_objectram[offs    ] == 0 &&
-		    mexico86_objectram[offs + 1] == 0 &&
-		    mexico86_objectram[offs + 2] == 0 &&
-		    mexico86_objectram[offs + 3] == 0)
+		/* skip empty sprites */
+		/* this is dword aligned so the UINT32 * cast shouldn't give problems */
+		/* on any architecture */
+		if (*(UINT32 *)(&mexico86_objectram[offs]) == 0)
 			continue;
 
 		gfx_num = mexico86_objectram[offs + 1];
@@ -164,13 +161,10 @@ void kikikai_vh_screenrefresh(struct osd_bitmap *bitmap,int full_refresh)
 if (offs >= mexico86_objectram_size && offs < mexico86_objectram_size+0x180) continue;
 if (offs >= mexico86_objectram_size+0x1c0) continue;
 
-		/* skip empty sprites - byte-by-byte zero check is endian- and
-		 * alignment-agnostic, and free vs. the original uint32_t cast
-		 * (which was UB by the C standard, and could fault on ARMv5). */
-		if (mexico86_objectram[offs    ] == 0 &&
-		    mexico86_objectram[offs + 1] == 0 &&
-		    mexico86_objectram[offs + 2] == 0 &&
-		    mexico86_objectram[offs + 3] == 0)
+		/* skip empty sprites */
+		/* this is dword aligned so the UINT32 * cast shouldn't give problems */
+		/* on any architecture */
+		if (*(UINT32 *)(&mexico86_objectram[offs]) == 0)
 			continue;
 
 		gfx_num = mexico86_objectram[offs + 1];

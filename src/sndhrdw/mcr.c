@@ -23,7 +23,7 @@
  *
  *************************************/
 
-uint8_t mcr_sound_config;
+UINT8 mcr_sound_config;
 
 
 
@@ -33,35 +33,35 @@ uint8_t mcr_sound_config;
  *
  *************************************/
 
-static uint16_t dacval;
+static UINT16 dacval;
 
 /* SSIO-specific globals */
-static uint8_t ssio_sound_cpu;
-static uint8_t ssio_data[4];
-static uint8_t ssio_status;
-static uint8_t ssio_duty_cycle[2][3];
+static UINT8 ssio_sound_cpu;
+static UINT8 ssio_data[4];
+static UINT8 ssio_status;
+static UINT8 ssio_duty_cycle[2][3];
 
 /* Chip Squeak Deluxe-specific globals */
-static uint8_t csdeluxe_sound_cpu;
-static uint8_t csdeluxe_dac_index;
+static UINT8 csdeluxe_sound_cpu;
+static UINT8 csdeluxe_dac_index;
 extern struct pia6821_interface csdeluxe_pia_intf;
 
 /* Turbo Chip Squeak-specific globals */
-static uint8_t turbocs_sound_cpu;
-static uint8_t turbocs_dac_index;
-static uint8_t turbocs_status;
+static UINT8 turbocs_sound_cpu;
+static UINT8 turbocs_dac_index;
+static UINT8 turbocs_status;
 extern struct pia6821_interface turbocs_pia_intf;
 
 /* Sounds Good-specific globals */
-static uint8_t soundsgood_sound_cpu;
-static uint8_t soundsgood_dac_index;
-static uint8_t soundsgood_status;
+static UINT8 soundsgood_sound_cpu;
+static UINT8 soundsgood_dac_index;
+static UINT8 soundsgood_status;
 extern struct pia6821_interface soundsgood_pia_intf;
 
 /* Squawk n' Talk-specific globals */
-static uint8_t squawkntalk_sound_cpu;
-static uint8_t squawkntalk_tms_command;
-static uint8_t squawkntalk_tms_strobes;
+static UINT8 squawkntalk_sound_cpu;
+static UINT8 squawkntalk_tms_command;
+static UINT8 squawkntalk_tms_strobes;
 extern struct pia6821_interface squawkntalk_pia0_intf;
 extern struct pia6821_interface squawkntalk_pia1_intf;
 

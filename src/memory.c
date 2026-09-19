@@ -20,6 +20,15 @@
 #include "driver.h"
 #include "osd_cpu.h"
 
+
+#define VERBOSE 0
+
+/* #define MEM_DUMP */
+
+#ifdef MEM_DUMP
+static void mem_dump( void );
+#endif
+
 /* Convenience macros - not in cpuintrf.h because they shouldn't be used by everyone */
 #define ADDRESS_BITS(index) 			(cpuintf[Machine->drv->cpu[index].cpu_type & ~CPU_FLAGS_MASK].address_bits)
 #define ABITS1(index)					(cpuintf[Machine->drv->cpu[index].cpu_type & ~CPU_FLAGS_MASK].abits1)
@@ -157,65 +166,58 @@ READ_HANDLER(mrh_nop)
 
 /***************************************************************************
 
-  Memory write handling (Safeguarded for PS2)
+  Memory write handling
 
 ***************************************************************************/
 
-WRITE_HANDLER(mwh_ram)        
-{ 
-    if (offset & 0x30000000) return; // Guard against high-address wrap-arounds
-    cpu_bankbase[0][offset] = data;
-}
-WRITE_HANDLER(mwh_bank1)    { if (offset & 0x30000000) return; cpu_bankbase[1][offset] = data; }
-WRITE_HANDLER(mwh_bank2)    { if (offset & 0x30000000) return; cpu_bankbase[2][offset] = data; }
-WRITE_HANDLER(mwh_bank3)    { if (offset & 0x30000000) return; cpu_bankbase[3][offset] = data; }
-WRITE_HANDLER(mwh_bank4)    { if (offset & 0x30000000) return; cpu_bankbase[4][offset] = data; }
-WRITE_HANDLER(mwh_bank5)    { if (offset & 0x30000000) return; cpu_bankbase[5][offset] = data; }
-WRITE_HANDLER(mwh_bank6)    { if (offset & 0x30000000) return; cpu_bankbase[6][offset] = data; }
-WRITE_HANDLER(mwh_bank7)    { if (offset & 0x30000000) return; cpu_bankbase[7][offset] = data; }
-WRITE_HANDLER(mwh_bank8)    { if (offset & 0x30000000) return; cpu_bankbase[8][offset] = data; }
-WRITE_HANDLER(mwh_bank9)    { if (offset & 0x30000000) return; cpu_bankbase[9][offset] = data; }
-WRITE_HANDLER(mwh_bank10)   { if (offset & 0x30000000) return; cpu_bankbase[10][offset] = data; }
-WRITE_HANDLER(mwh_bank11)   { if (offset & 0x30000000) return; cpu_bankbase[11][offset] = data; }
-WRITE_HANDLER(mwh_bank12)   { if (offset & 0x30000000) return; cpu_bankbase[12][offset] = data; }
-WRITE_HANDLER(mwh_bank13)   { if (offset & 0x30000000) return; cpu_bankbase[13][offset] = data; }
-WRITE_HANDLER(mwh_bank14)   { if (offset & 0x30000000) return; cpu_bankbase[14][offset] = data; }
-WRITE_HANDLER(mwh_bank15)   { if (offset & 0x30000000) return; cpu_bankbase[15][offset] = data; }
-WRITE_HANDLER(mwh_bank16)   { if (offset & 0x30000000) return; cpu_bankbase[16][offset] = data; }
-
+WRITE_HANDLER(mwh_ram)		{ cpu_bankbase[0][offset] = data;}
+WRITE_HANDLER(mwh_bank1)	{ cpu_bankbase[1][offset] = data; }
+WRITE_HANDLER(mwh_bank2)	{ cpu_bankbase[2][offset] = data; }
+WRITE_HANDLER(mwh_bank3)	{ cpu_bankbase[3][offset] = data; }
+WRITE_HANDLER(mwh_bank4)	{ cpu_bankbase[4][offset] = data; }
+WRITE_HANDLER(mwh_bank5)	{ cpu_bankbase[5][offset] = data; }
+WRITE_HANDLER(mwh_bank6)	{ cpu_bankbase[6][offset] = data; }
+WRITE_HANDLER(mwh_bank7)	{ cpu_bankbase[7][offset] = data; }
+WRITE_HANDLER(mwh_bank8)	{ cpu_bankbase[8][offset] = data; }
+WRITE_HANDLER(mwh_bank9)	{ cpu_bankbase[9][offset] = data; }
+WRITE_HANDLER(mwh_bank10)	{ cpu_bankbase[10][offset] = data; }
+WRITE_HANDLER(mwh_bank11)	{ cpu_bankbase[11][offset] = data; }
+WRITE_HANDLER(mwh_bank12)	{ cpu_bankbase[12][offset] = data; }
+WRITE_HANDLER(mwh_bank13)	{ cpu_bankbase[13][offset] = data; }
+WRITE_HANDLER(mwh_bank14)	{ cpu_bankbase[14][offset] = data; }
+WRITE_HANDLER(mwh_bank15)	{ cpu_bankbase[15][offset] = data; }
+WRITE_HANDLER(mwh_bank16)	{ cpu_bankbase[16][offset] = data; }
 static mem_write_handler bank_write_handler[] =
 {
-    mwh_ram,   mwh_bank1,  mwh_bank2,  mwh_bank3,  mwh_bank4,  mwh_bank5,  mwh_bank6,  mwh_bank7,
-    mwh_bank8, mwh_bank9,  mwh_bank10, mwh_bank11, mwh_bank12, mwh_bank13, mwh_bank14, mwh_bank15,
-    mwh_bank16
+	mwh_ram,   mwh_bank1,  mwh_bank2,  mwh_bank3,  mwh_bank4,  mwh_bank5,  mwh_bank6,  mwh_bank7,
+	mwh_bank8, mwh_bank9,  mwh_bank10, mwh_bank11, mwh_bank12, mwh_bank13, mwh_bank14, mwh_bank15,
+	mwh_bank16
 };
 
 WRITE_HANDLER(mwh_error)
 {
-    logerror("CPU #%d PC %04x: warning - write %02x to unmapped memory address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
-    if ((offset & 0xF0000000) == 0x30000000) return; // Prevent out-of-bounds pointer write crash
-    cpu_bankbase[0][offset] = data;
+	logerror("CPU #%d PC %04x: warning - write %02x to unmapped memory address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+	cpu_bankbase[0][offset] = data;
 }
 
 WRITE_HANDLER(mwh_error_sparse)
 {
-    logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory address %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+	logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory address %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
 }
 
 WRITE_HANDLER(mwh_error_sparse_bit)
 {
-    logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory bit addr %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset<<3);
+	logerror("CPU #%d PC %08x: warning - write %02x to unmapped memory bit addr %08x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset<<3);
 }
 
 WRITE_HANDLER(mwh_rom)
 {
-    logerror("CPU #%d PC %04x: warning - write %02x to ROM address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
+	logerror("CPU #%d PC %04x: warning - write %02x to ROM address %04x\n",cpu_getactivecpu(),cpu_get_pc(),data,offset);
 }
 
 WRITE_HANDLER(mwh_ramrom)
 {
-    if ((offset & 0xF0000000) == 0x30000000) return;
-    cpu_bankbase[0][offset] = cpu_bankbase[0][offset + (OP_ROM - OP_RAM)] = data;
+	cpu_bankbase[0][offset] = cpu_bankbase[0][offset + (OP_ROM - OP_RAM)] = data;
 }
 
 WRITE_HANDLER(mwh_nop)
@@ -248,6 +250,9 @@ static MHELE *get_element( MHELE *element , int ad , int elemask ,
 	/* get new element nunber */
 	ele = *ele_max;
 	(*ele_max)+=banks;
+#ifdef MEM_DUMP
+	logerror("create element %2d(%2d)\n",ele,banks);
+#endif
 	/* set link mark to current element */
 	element[ad] = ele + MH_HARDMAX;
 	/* get next subelement top */
@@ -269,6 +274,9 @@ static void set_element( int cpu , MHELE *celement , int sp , int ep , MHELE typ
 	MHELE *ele;
 	int ss,sb,eb,ee;
 
+#ifdef MEM_DUMP
+	logerror("set_element %8X-%8X = %2X\n",sp,ep,type);
+#endif
 	if( (unsigned int) sp > (unsigned int) ep ) return;
 	do{
 		mask  = mhmask[cpu][edepth];
@@ -639,6 +647,9 @@ int memory_init(void)
 	logerror("used write elements %d/%d , functions %d/%d\n"
 			,wrelement_max,MH_ELEMAX , wrhard_max,MH_HARDMAX );
 
+#ifdef MEM_DUMP
+	mem_dump();
+#endif
 	return 1;	/* ok */
 }
 
@@ -747,7 +758,7 @@ void name(int pc)																		\
 {																						\
 	MHELE hw;																			\
 																						\
-	pc = (uint32_t)pc >> shift;															\
+	pc = (UINT32)pc >> shift;															\
 																						\
 	/* allow overrides */																\
 	if (OPbasefunc) 																	\
@@ -758,11 +769,11 @@ void name(int pc)																		\
 	}																					\
 																						\
 	/* perform the lookup */															\
-	hw = cur_mrhard[(uint32_t)pc >> (ABITS2_##abits + ABITS_MIN_##abits)];				\
+	hw = cur_mrhard[(UINT32)pc >> (ABITS2_##abits + ABITS_MIN_##abits)];				\
 	if (hw >= MH_HARDMAX)																\
 	{																					\
 		hw -= MH_HARDMAX;																\
-		hw = readhardware[(hw << MH_SBITS) + (((uint32_t)pc >> ABITS_MIN_##abits) & MHMASK(ABITS2_##abits))]; \
+		hw = readhardware[(hw << MH_SBITS) + (((UINT32)pc >> ABITS_MIN_##abits) & MHMASK(ABITS2_##abits))]; \
 	}																					\
 	ophw = hw;																			\
 																						\
@@ -948,17 +959,33 @@ void cpu_setOPbaseoverride (int cpu,opbase_handler function)
 
 void *install_mem_read_handler(int cpu, int start, int end, mem_read_handler handler)
 {
-	int i;
 	MHELE hardware = 0;
-	int abitsmin = ABITSMIN (cpu);
+	int abitsmin;
+	int i, hw_set;
+#if VERBOSE
+	logerror("Install new memory read handler:\n");
+	logerror("             cpu: %d\n", cpu);
+	logerror("           start: 0x%08x\n", start);
+	logerror("             end: 0x%08x\n", end);
+#ifdef __LP64__
+	logerror(" handler address: 0x%016lx\n", (unsigned long) handler);
+#else
+	logerror(" handler address: 0x%08x\n", (unsigned int) handler);
+#endif
+#endif
+	abitsmin = ABITSMIN (cpu);
+
 	/* see if this function is already registered */
-	int hw_set = 0;
+	hw_set = 0;
 	for ( i = 0 ; i < MH_HARDMAX ; i++)
 	{
 		/* record it if it matches */
 		if (( memoryreadhandler[i] == handler ) &&
 			(  memoryreadoffset[i] == start))
 		{
+#if VERBOSE
+			logerror("handler match - use old one\n");
+#endif
 			hardware = i;
 			hw_set = 1;
 		}
@@ -1009,22 +1036,43 @@ void *install_mem_read_handler(int cpu, int start, int end, mem_read_handler han
 		(((unsigned int) start) >> abitsmin) ,
 		(((unsigned int) end) >> abitsmin) ,
 		hardware , readhardware , &rdelement_max );
+#if VERBOSE
+	logerror("Done installing new memory handler.\n");
+	logerror("used read  elements %d/%d , functions %d/%d\n"
+			,rdelement_max,MH_ELEMAX , rdhard_max,MH_HARDMAX );
+#endif
 	return memory_find_base(cpu, start);
 }
 
 void *install_mem_write_handler(int cpu, int start, int end, mem_write_handler handler)
 {
-	int i;
 	MHELE hardware = 0;
-	int abitsmin = ABITSMIN (cpu);
+	int abitsmin;
+	int i, hw_set;
+#if VERBOSE
+	logerror("Install new memory write handler:\n");
+	logerror("             cpu: %d\n", cpu);
+	logerror("           start: 0x%08x\n", start);
+	logerror("             end: 0x%08x\n", end);
+#ifdef __LP64__
+	logerror(" handler address: 0x%016lx\n", (unsigned long) handler);
+#else
+	logerror(" handler address: 0x%08x\n", (unsigned int) handler);
+#endif
+#endif
+	abitsmin = ABITSMIN (cpu);
+
 	/* see if this function is already registered */
-	int hw_set = 0;
+	hw_set = 0;
 	for ( i = 0 ; i < MH_HARDMAX ; i++)
 	{
 		/* record it if it matches */
 		if (( memorywritehandler[i] == handler ) &&
 			(  memorywriteoffset[i] == start))
 		{
+#if VERBOSE
+			logerror("handler match - use old one\n");
+#endif
 			hardware = i;
 			hw_set = 1;
 		}
@@ -1087,6 +1135,11 @@ void *install_mem_write_handler(int cpu, int start, int end, mem_write_handler h
 		(((unsigned int) start) >> abitsmin) ,
 		(((unsigned int) end) >> abitsmin) ,
 		hardware , writehardware , &wrelement_max );
+#if VERBOSE
+	logerror("Done installing new memory handler.\n");
+	logerror("used write elements %d/%d , functions %d/%d\n"
+			,wrelement_max,MH_ELEMAX , wrhard_max,MH_HARDMAX );
+#endif
 	return memory_find_base(cpu, start);
 }
 
@@ -1130,8 +1183,13 @@ static void *install_port_read_handler_common(int cpu, int start, int end,
 		i = 0;
 	}
 	else
+	{
 		i = oldsize / sizeof(struct IOReadPort);
+	}
 
+#ifdef MEM_DUMP
+	logerror("Installing port read handler: cpu %d  slot %X  start %X  end %X\n", cpu, i, start, end);
+#endif
 
 	readport[cpu][i].start = start;
 	readport[cpu][i].end = end;
@@ -1170,7 +1228,13 @@ static void *install_port_write_handler_common(int cpu, int start, int end,
 		i = 0;
 	}
 	else
+	{
 		i = oldsize / sizeof(struct IOWritePort);
+	}
+
+#ifdef MEM_DUMP
+	logerror("Installing port write handler: cpu %d  slot %X  start %X  end %X\n", cpu, i, start, end);
+#endif
 
 	writeport[cpu][i].start = start;
 	writeport[cpu][i].end = end;
@@ -1178,3 +1242,68 @@ static void *install_port_write_handler_common(int cpu, int start, int end,
 
 	return writeport[cpu];
 }
+
+#ifdef MEM_DUMP
+static void mem_dump( void )
+{
+	extern int totalcpu;
+	int cpu;
+	int naddr,addr;
+	MHELE nhw,hw;
+
+	FILE *temp = fopen ("memdump.log", "w");
+
+	if (!temp) return;
+
+	for( cpu = 0 ; cpu < 1 ; cpu++ )
+	{
+		fprintf(temp,"cpu %d read memory \n",cpu);
+		addr = 0;
+		naddr = 0;
+		nhw = 0xff;
+		while( (addr >> mhshift[cpu][0]) <= mhmask[cpu][0] ){
+			hw = cur_mr_element[cpu][addr >> mhshift[cpu][0]];
+			if( hw >= MH_HARDMAX )
+			{	/* 2nd element link */
+				hw = readhardware[((hw-MH_HARDMAX)<<MH_SBITS) + ((addr>>mhshift[cpu][1]) & mhmask[cpu][1])];
+				if( hw >= MH_HARDMAX )
+					hw = readhardware[((hw-MH_HARDMAX)<<MH_SBITS) + (addr & mhmask[cpu][2])];
+			}
+			if( nhw != hw )
+			{
+				if( addr )
+	fprintf(temp,"  %08x(%08x) - %08x = %02x\n",naddr,memoryreadoffset[nhw],addr-1,nhw);
+				nhw = hw;
+				naddr = addr;
+			}
+			addr++;
+		}
+		fprintf(temp,"  %08x(%08x) - %08x = %02x\n",naddr,memoryreadoffset[nhw],addr-1,nhw);
+
+		fprintf(temp,"cpu %d write memory \n",cpu);
+		naddr = 0;
+		addr = 0;
+		nhw = 0xff;
+		while( (addr >> mhshift[cpu][0]) <= mhmask[cpu][0] ){
+			hw = cur_mw_element[cpu][addr >> mhshift[cpu][0]];
+			if( hw >= MH_HARDMAX )
+			{	/* 2nd element link */
+				hw = writehardware[((hw-MH_HARDMAX)<<MH_SBITS) + ((addr>>mhshift[cpu][1]) & mhmask[cpu][1])];
+				if( hw >= MH_HARDMAX )
+					hw = writehardware[((hw-MH_HARDMAX)<<MH_SBITS) + (addr & mhmask[cpu][2])];
+			}
+			if( nhw != hw )
+			{
+				if( addr )
+	fprintf(temp,"  %08x(%08x) - %08x = %02x\n",naddr,memorywriteoffset[nhw],addr-1,nhw);
+				nhw = hw;
+				naddr = addr;
+			}
+			addr++;
+		}
+	fprintf(temp,"  %08x(%08x) - %08x = %02x\n",naddr,memorywriteoffset[nhw],addr-1,nhw);
+	}
+	fclose(temp);
+}
+#endif
+

@@ -57,7 +57,7 @@
 #undef MAP
 #define MAP 													\
  { \
-  uint16_t low, high; \
+  UINT16 low, high; \
   low=m4510.low; \
   high=m4510.high; \
   m4510.low=m4510.a|(m4510.x<<8); \

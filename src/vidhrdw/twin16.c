@@ -13,8 +13,8 @@
 
 #include "vidhrdw/generic.h"
 
-extern uint16_t twin16_custom_vidhrdw;
-extern uint16_t *twin16_gfx_rom;
+extern UINT16 twin16_custom_vidhrdw;
+extern UINT16 *twin16_gfx_rom;
 extern unsigned char *twin16_fixram;
 extern unsigned char *twin16_sprite_gfx_ram;
 extern unsigned char *twin16_tile_gfx_ram;
@@ -22,9 +22,9 @@ extern void twin16_gfx_decode( void );
 extern int twin16_spriteram_process_enable( void );
 
 static int need_process_spriteram;
-static uint16_t gfx_bank;
-static uint16_t scrollx[3], scrolly[3];
-static uint16_t video_register;
+static UINT16 gfx_bank;
+static UINT16 scrollx[3], scrolly[3];
+static UINT16 video_register;
 
 enum {
 	TWIN16_SCREEN_FLIPY		= 0x01,	/* ? breaks devils world text layer */
@@ -67,7 +67,7 @@ WRITE_HANDLER( twin16_video_register_w ){
 
 static void draw_text( struct osd_bitmap *bitmap ){
 	const struct rectangle *clip = &Machine->visible_area;
-	const uint16_t *source = (uint16_t *)twin16_fixram;
+	const UINT16 *source = (UINT16 *)twin16_fixram;
 	int i;
 
 	int tile_flipx = 0;
@@ -97,8 +97,8 @@ static void draw_text( struct osd_bitmap *bitmap ){
 
 static void draw_sprite( /* slow slow slow, but it's ok for now */
 	struct osd_bitmap *bitmap,
-	const uint16_t *pen_data,
-	const uint16_t *pal_data,
+	const UINT16 *pen_data,
+	const UINT16 *pal_data,
 	int xpos, int ypos,
 	int width, int height,
 	int flipx, int flipy ){
@@ -116,13 +116,13 @@ static void draw_sprite( /* slow slow slow, but it's ok for now */
 				int sy = (flipy)?(ypos+height-1-y):(ypos+y);
 				if( sy>=16 && sy<256-16 )
 				{
-					uint16_t *dest = (uint16_t *)bitmap->line[sy];
+					UINT16 *dest = (UINT16 *)bitmap->line[sy];
 					for( x=0; x<width; x++ )
 					{
 						int sx = (flipx)?(xpos+width-1-x):(xpos+x);
 						if( sx>=0 && sx<320 )
 						{
-							uint16_t pen = pen_data[x/4];
+							UINT16 pen = pen_data[x/4];
 							switch( x%4 )
 							{
 							case 0: pen = pen>>12; break;
@@ -144,13 +144,13 @@ static void draw_sprite( /* slow slow slow, but it's ok for now */
 				int sy = (flipy)?(ypos+height-1-y):(ypos+y);
 				if( sy>=16 && sy<256-16 )
 				{
-					uint8_t *dest = (uint8_t *)bitmap->line[sy];
+					UINT8 *dest = (UINT8 *)bitmap->line[sy];
 					for( x=0; x<width; x++ )
 					{
 						int sx = (flipx)?(xpos+width-1-x):(xpos+x);
 						if( sx>=0 && sx<320 )
 						{
-							uint16_t pen = pen_data[x/4];
+							UINT16 pen = pen_data[x/4];
 							switch( x%4 )
 							{
 							case 0: pen = pen>>12; break;
@@ -169,22 +169,22 @@ static void draw_sprite( /* slow slow slow, but it's ok for now */
 }
 
 void twin16_spriteram_process( void ){
-	uint16_t dx = scrollx[0];
-	uint16_t dy = scrolly[0];
+	UINT16 dx = scrollx[0];
+	UINT16 dy = scrolly[0];
 
-	const uint16_t *source = (const uint16_t *)&spriteram[0x0000];
-	const uint16_t *finish = (const uint16_t *)&spriteram[0x3000];
+	const UINT16 *source = (const UINT16 *)&spriteram[0x0000];
+	const UINT16 *finish = (const UINT16 *)&spriteram[0x3000];
 
 	memset( &spriteram[0x3000], 0, 0x800 );
 	while( source<finish ){
-		uint16_t priority = source[0];
+		UINT16 priority = source[0];
 		if( priority & 0x8000 ){
-			uint16_t *dest = (uint16_t *)&spriteram[0x3000 + 8*(priority&0xff)];
+			UINT16 *dest = (UINT16 *)&spriteram[0x3000 + 8*(priority&0xff)];
 
-			int32_t xpos = (0x10000*source[4])|source[5];
-			int32_t ypos = (0x10000*source[6])|source[7];
+			INT32 xpos = (0x10000*source[4])|source[5];
+			INT32 ypos = (0x10000*source[6])|source[7];
 
-			uint16_t attributes = source[2]&0x03ff; /* scale,size,color */
+			UINT16 attributes = source[2]&0x03ff; /* scale,size,color */
 			if( priority & 0x0200 ) attributes |= 0x4000;
 			attributes |= 0x8000;
 
@@ -221,22 +221,22 @@ void twin16_spriteram_process( void ){
 
 static void draw_sprites( struct osd_bitmap *bitmap, int pri ){
 	int count = 0;
-	const uint16_t *source = 0x1800+(uint16_t *)spriteram;
-	const uint16_t *finish = source + 0x800;
+	const UINT16 *source = 0x1800+(UINT16 *)spriteram;
+	const UINT16 *finish = source + 0x800;
 	pri = pri?0x4000:0x0000;
 
 	while( source<finish ){
-		uint16_t attributes = source[3];
-		uint16_t code = source[0];
+		UINT16 attributes = source[3];
+		UINT16 code = source[0];
 
 		if( code!=0xffff && (attributes&0x8000) && (attributes&0x4000)==pri ){
-			int xpos = (int16_t)source[1];
-			int ypos = (int16_t)source[2];
+			int xpos = (INT16)source[1];
+			int ypos = (INT16)source[2];
 
-			const uint16_t *pal_data = Machine->pens+((attributes&0xf)+0x10)*16;
+			const UINT16 *pal_data = Machine->pens+((attributes&0xf)+0x10)*16;
 			int height	= 16<<((attributes>>6)&0x3);
 			int width	= 16<<((attributes>>4)&0x3);
-			const uint16_t *pen_data = 0;
+			const UINT16 *pen_data = 0;
 			int flipy = attributes&0x0200;
 			int flipx = attributes&0x0100;
 
@@ -259,7 +259,7 @@ static void draw_sprites( struct osd_bitmap *bitmap, int pri ){
 					break;
 
 					case 3:
-					pen_data = (uint16_t *)twin16_sprite_gfx_ram;
+					pen_data = (UINT16 *)twin16_sprite_gfx_ram;
 					break;
 				}
 				code &= 0xfff;
@@ -298,8 +298,8 @@ static void show_video_register( struct osd_bitmap *bitmap ){
 }
 
 static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
-	const uint16_t *gfx_base;
-	const uint16_t *source = (uint16_t *)videoram;
+	const UINT16 *gfx_base;
+	const UINT16 *source = (UINT16 *)videoram;
 	int i, y1, y2, yd;
 	int bank_table[4];
 	int dx, dy, palette;
@@ -327,7 +327,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 		bank_table[0] = (gfx_bank>>(4*0))&0xf;
 	}
 	else {
-		gfx_base = (uint16_t *)twin16_tile_gfx_ram;
+		gfx_base = (UINT16 *)twin16_tile_gfx_ram;
 		bank_table[0] = 0;
 		bank_table[1] = 1;
 		bank_table[2] = 2;
@@ -371,13 +371,13 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 				---xx-----------	tile bank
 				-----xxxxxxxxxxx	tile number
 			*/
-			const uint16_t *gfx_data = gfx_base + (code&0x7ff)*16 + bank_table[(code>>11)&0x3]*0x8000;
+			const UINT16 *gfx_data = gfx_base + (code&0x7ff)*16 + bank_table[(code>>11)&0x3]*0x8000;
 			int color = (code>>13);
-			uint16_t *pal_data = Machine->pens + 16*(0x20+color+8*palette);
+			UINT16 *pal_data = Machine->pens + 16*(0x20+color+8*palette);
 
 			{
 				int y;
-				uint16_t data;
+				UINT16 data;
 				int pen;
 
 				if( tile_flipx )
@@ -388,7 +388,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint16_t *dest = ((uint16_t *)bitmap->line[ypos+y])+xpos;
+								UINT16 *dest = ((UINT16 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								dest[7] = pal_data[(data>>4*3)&0xf];
 								dest[6] = pal_data[(data>>4*2)&0xf];
@@ -405,7 +405,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint8_t *dest = ((uint8_t *)bitmap->line[ypos+y])+xpos;
+								UINT8 *dest = ((UINT8 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								dest[7] = pal_data[(data>>4*3)&0xf];
 								dest[6] = pal_data[(data>>4*2)&0xf];
@@ -425,7 +425,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint8_t *dest = ((uint8_t *)bitmap->line[ypos+y])+xpos;
+								UINT8 *dest = ((UINT8 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								if( data )
 								{
@@ -448,7 +448,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint16_t *dest = ((uint16_t *)bitmap->line[ypos+y])+xpos;
+								UINT16 *dest = ((UINT16 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								if( data )
 								{
@@ -477,7 +477,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint16_t *dest = ((uint16_t *)bitmap->line[ypos+y])+xpos;
+								UINT16 *dest = ((UINT16 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								*dest++ = pal_data[(data>>4*3)&0xf];
 								*dest++ = pal_data[(data>>4*2)&0xf];
@@ -494,7 +494,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint8_t *dest = ((uint8_t *)bitmap->line[ypos+y])+xpos;
+								UINT8 *dest = ((UINT8 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								*dest++ = pal_data[(data>>4*3)&0xf];
 								*dest++ = pal_data[(data>>4*2)&0xf];
@@ -514,7 +514,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint16_t *dest = ((uint16_t *)bitmap->line[ypos+y])+xpos;
+								UINT16 *dest = ((UINT16 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								if( data )
 								{
@@ -537,7 +537,7 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 						{
 							for( y=y1; y!=y2; y+=yd )
 							{
-								uint8_t *dest = ((uint8_t *)bitmap->line[ypos+y])+xpos;
+								UINT8 *dest = ((UINT8 *)bitmap->line[ypos+y])+xpos;
 								data = *gfx_data++;
 								if( data )
 								{
@@ -564,13 +564,13 @@ static void draw_layer( struct osd_bitmap *bitmap, int opaque ){
 }
 
 static void mark_used_colors( void ){
-	const uint16_t *source, *finish;
+	const UINT16 *source, *finish;
 	unsigned char used[0x40], *used_ptr;
 	memset( used, 0, 0x40 );
 
 	/* text layer */
 	used_ptr = &used[0x00];
-	source = (uint16_t *)twin16_fixram;
+	source = (UINT16 *)twin16_fixram;
 	finish = source + 0x1000;
 	while( source<finish ){
 		int code = *source++;
@@ -579,18 +579,18 @@ static void mark_used_colors( void ){
 
 	/* sprites */
 	used_ptr = &used[0x10];
-	source = 0x1800+(uint16_t *)spriteram;
+	source = 0x1800+(UINT16 *)spriteram;
 	finish = source + 0x800;
 	while( source<finish ){
-		uint16_t attributes = source[3];
-		uint16_t code = source[0];
+		UINT16 attributes = source[3];
+		UINT16 code = source[0];
 		if( code!=0xffff && (attributes&0x8000) ) used_ptr[attributes&0xf] = 1;
 		source++;
 	}
 
 	/* plane#0 */
 	used_ptr = &used[0x20];
-	source = (uint16_t *)videoram;
+	source = (UINT16 *)videoram;
 	finish = source+0x1000;
 	while( source<finish ){
 		int code = *source++;
@@ -599,7 +599,7 @@ static void mark_used_colors( void ){
 
 	/* plane#1 */
 	used_ptr = &used[0x28];
-	source = 0x1000+(uint16_t *)videoram;
+	source = 0x1000+(UINT16 *)videoram;
 	finish = source+0x1000;
 	while( source<finish ){
 		int code = *source++;

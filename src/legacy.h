@@ -273,7 +273,7 @@ static int seq_partial_is_special_code(InputCode code) {
 
 static int seq_partial_read(void* f, InputSeq* seq, unsigned* pos, unsigned len, int (*code_table)(int))
 {
-	uint16_t w;
+	UINT16 w;
 	unsigned j = 0;
 	int code;
 
@@ -298,12 +298,10 @@ static int seq_partial_read(void* f, InputSeq* seq, unsigned* pos, unsigned len,
 	{
 		if (*pos)
 		{
-			if (*pos >= SEQ_MAX) return -1;
 			(*seq)[*pos] = CODE_OR;
 			++*pos;
 		}
 
-		if (*pos >= SEQ_MAX) return -1;
 		(*seq)[*pos] = code;
 		++*pos;
 
@@ -319,7 +317,6 @@ static int seq_partial_read(void* f, InputSeq* seq, unsigned* pos, unsigned len,
 			if (code == CODE_NONE)
 				break;
 
-			if (*pos >= SEQ_MAX) return -1;
 			(*seq)[*pos] = code;
 			++*pos;
 		}
@@ -373,8 +370,8 @@ static int seq_read_ver_7(void* f, InputSeq* seq)
 
 static int input_port_read_ver_5(void *f, struct InputPort *in)
 {
-	uint32_t i;
-	uint16_t w;
+	UINT32 i;
+	UINT16 w;
 	if (readint(f,&i) != 0)
 		return -1;
 	in->type = i;
@@ -394,8 +391,8 @@ static int input_port_read_ver_5(void *f, struct InputPort *in)
 
 static int input_port_read_ver_6(void *f, struct InputPort *in)
 {
-	uint32_t i;
-	uint16_t w;
+	UINT32 i;
+	UINT16 w;
 	if (readint(f,&i) != 0)
 		return -1;
 	in->type = i;
@@ -415,8 +412,8 @@ static int input_port_read_ver_6(void *f, struct InputPort *in)
 
 static int input_port_read_ver_7(void *f, struct InputPort *in)
 {
-	uint32_t i;
-	uint16_t w;
+	UINT32 i;
+	UINT16 w;
 	if (readint(f,&i) != 0)
 		return -1;
 	in->type = i;

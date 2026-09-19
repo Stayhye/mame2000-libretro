@@ -142,7 +142,7 @@ static WRITE_HANDLER( combasc_coin_counter_w )
 
 static READ_HANDLER( trackball_r )
 {
-	static uint8_t pos[4],sign[4];
+	static UINT8 pos[4],sign[4];
 
 	if (offset == 0)
 	{
@@ -150,7 +150,7 @@ static READ_HANDLER( trackball_r )
 
 		for (i = 0;i < 4;i++)
 		{
-			uint8_t curr;
+			UINT8 curr;
 
 			curr = readinputport(4 + i);
 

@@ -44,7 +44,7 @@ WRITE_HANDLER( hanaawas_colorram_w );
 static READ_HANDLER( hanaawas_input_port_0_r )
 {
 	int i,ordinal = 0;
-	uint16_t buttons;
+	UINT16 buttons;
 
 	/* as to which player's jeys are read are probably selected via port 0, but
 	   it's not obvious to me how */

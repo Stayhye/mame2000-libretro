@@ -69,7 +69,7 @@ static void draw_chars(struct osd_bitmap *bitmap, int priority)
 	for (offs = 0; offs < videoram_size; offs++)
 	{
 		int code,sx,sy,col;
-		uint8_t scroll;
+		UINT8 scroll;
 
 
 		sy = (offs / 32);

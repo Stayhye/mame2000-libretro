@@ -15,6 +15,9 @@
 */
 
 #include <fcntl.h>
+#ifndef WANT_LIBCO
+#include <pthread.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,23 +38,20 @@ extern "C" {
 extern int safe_render_path;
 
 #define gp2x_video_color8(C,R,G,B) gp2x_palette[C]=gp2x_video_color15(R,G,B,0)
-//#define gp2x_video_color15(R,G,B,A) ((((R)&0xF8)<<8)|(((G)&0xF8)<<3)|(((B)&0xF8)>>3)|((A)<<5))
-//#define gp2x_video_color15(R,G,B,A)  ((R >> 3) << 10) | (( G >> 3) << 5 ) | (( B >> 3 ) << 0 )
-#define gp2x_video_color15(R,G,B,A)  (((B >> 3) << 10) | ((G >> 3) << 5) | ((R >> 3) << 0))
 
-//#define gp2x_video_color15(R,G,B,A) (safe_render_path  ? ((R >> 3) << 10) | (( G >> 3) << 5 ) | (( B >> 3 ) << 0 ) : ((R >> 3) << 11) | (( G >> 2) << 5 ) | (( B >> 3 ) << 0 ))
+#if defined(ABGR1555)
+#define gp2x_video_color15(R,G,B,A)  ((B >> 3) << 11) | (( G >> 3) << 5 ) | (( R >> 3 ) << 0 )
 
-#define RGB2565L(R, G, B) ((R >> 3) << 11) | (( G >> 2) << 5 ) | (( B >> 3 ) << 0 )
-#define RGBA5551(R, G, B) ((R >> 3) << 10) | (( G >> 3) << 5 ) | (( B >> 3 ) << 0 )
+#define gp2x_video_getr15(C) ((((C)>>00)<<3)&0x00FF)
+#define gp2x_video_getg15(C) ((((C)>>05)<<3)&0x00FF)
+#define gp2x_video_getb15(C) ((((C)>>10)<<3)&0x00FF)
+#else
+#define gp2x_video_color15(R,G,B,A)  ((R >> 3) << 11) | (( G >> 2) << 5 ) | (( B >> 3 ) << 0 )
 
-//#define gp2x_video_getr15(C) (((C)>>8)&0xF8)
-//#define gp2x_video_getg15(C) (((C)>>3)&0xF8)
-//#define gp2x_video_getb15(C) (((C)<<3)&0xF8)
-
-//TODO
 #define gp2x_video_getr15(C) ((((C)>>10)<<3)&0x00FF)
 #define gp2x_video_getg15(C) ((((C)>>05)<<3)&0x00FF)
 #define gp2x_video_getb15(C) ((((C)>>00)<<3)&0x00FF)
+#endif
 
 enum  { GP2X_UP=0x1,       GP2X_LEFT=0x4,       GP2X_DOWN=0x10,  GP2X_RIGHT=0x40,
         GP2X_START=1<<8,   GP2X_SELECT=1<<9,    GP2X_L=1<<10,    GP2X_R=1<<11,
@@ -74,6 +74,8 @@ extern void gp2x_sound_play(void *buff, int len);
 extern void gp2x_video_flip(void);
 extern void gp2x_video_flip_single(void);
 extern void gp2x_video_setpalette(void);
+extern unsigned long gp2x_joystick_read(int n);
+extern unsigned long gp2x_joystick_press (int n);
 extern void gp2x_sound_volume(int left, int right);
 extern void gp2x_sound_thread_mute(void);
 extern void gp2x_sound_thread_start(int len);

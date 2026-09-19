@@ -327,7 +327,7 @@ int execute_instruction (int md);
 /* PDP1 Registers */
 typedef struct
 {
-	uint32_t pc;
+	UINT32 pc;
 	int ac;
 	int io;
 	int y;
@@ -377,7 +377,7 @@ unsigned pdp1_get_pc (void)
 	return PC;
 }
 
-void pdp1_set_pc (uint32_t newpc)
+void pdp1_set_pc (UINT32 newpc)
 {
 	PC = newpc;
 }
@@ -388,7 +388,7 @@ unsigned pdp1_get_sp (void)
 	return 0;
 }
 
-void pdp1_set_sp (uint32_t newsp)
+void pdp1_set_sp (UINT32 newsp)
 {
 	/* nothing to do */
 }

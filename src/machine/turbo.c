@@ -10,18 +10,18 @@
 #include "machine/8255ppi.h"
 
 /* globals */
-uint8_t turbo_opa, turbo_opb, turbo_opc;
-uint8_t turbo_ipa, turbo_ipb, turbo_ipc;
-uint8_t turbo_fbpla, turbo_fbcol;
-uint8_t turbo_segment_data[32];
-uint8_t turbo_speed;
+UINT8 turbo_opa, turbo_opb, turbo_opc;
+UINT8 turbo_ipa, turbo_ipb, turbo_ipc;
+UINT8 turbo_fbpla, turbo_fbcol;
+UINT8 turbo_segment_data[32];
+UINT8 turbo_speed;
 
 /* local data */
-static uint8_t segment_address, segment_increment;
-static uint8_t osel, bsel, accel;
+static UINT8 segment_address, segment_increment;
+static UINT8 osel, bsel, accel;
 
 /* prototypes */
-extern uint8_t turbo_collision;
+extern UINT8 turbo_collision;
 
 
 /*******************************************

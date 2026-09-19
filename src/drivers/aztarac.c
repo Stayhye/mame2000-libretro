@@ -24,7 +24,7 @@ int aztarac_vh_start (void);
 WRITE_HANDLER( aztarac_ubr_w );
 int aztarac_vg_interrupt(void);
 
-extern uint8_t *aztarac_vectorram;
+extern UINT8 *aztarac_vectorram;
 
 /* from sndhrdw/aztarac.c */
 READ_HANDLER( aztarac_sound_r );

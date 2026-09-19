@@ -17,7 +17,7 @@
 
 
 /* Size of the memory buffer allocated for the shiftr register */
-#define SHIFTREG_SIZE			(8 * 512 * sizeof(uint16_t))
+#define SHIFTREG_SIZE			(8 * 512 * sizeof(UINT16))
 
 
 
@@ -94,36 +94,36 @@ enum
 **#################################################################################################*/
 
 #define WFIELDMAC(MASK,MAX) 														\
-	uint32_t shift = offset & 0x0f;     												\
-	uint32_t masked_data = data & (MASK);												\
-	uint32_t old;				   														\
+	UINT32 shift = offset & 0x0f;     												\
+	UINT32 masked_data = data & (MASK);												\
+	UINT32 old;				   														\
 																					\
 	offset = TOBYTE(offset & 0xfffffff0);											\
 																					\
 	if (shift >= MAX)																\
 	{																				\
-		old = (uint32_t)TMS34010_RDMEM_DWORD(offset) & ~((MASK) << shift); 			\
+		old = (UINT32)TMS34010_RDMEM_DWORD(offset) & ~((MASK) << shift); 			\
 		TMS34010_WRMEM_DWORD(offset, (masked_data << shift) | old);					\
 	}																				\
 	else																			\
 	{																				\
-		old = (uint32_t)TMS34010_RDMEM_WORD(offset) & ~((MASK) << shift); 			\
+		old = (UINT32)TMS34010_RDMEM_WORD(offset) & ~((MASK) << shift); 			\
 		TMS34010_WRMEM_WORD(offset, ((masked_data & (MASK)) << shift) | old);		\
 	}																				\
 
 #define WFIELDMAC_BIG(MASK,MAX)														\
-	uint32_t shift = offset & 0x0f;     												\
-	uint32_t masked_data = data & (MASK);												\
-	uint32_t old;				   														\
+	UINT32 shift = offset & 0x0f;     												\
+	UINT32 masked_data = data & (MASK);												\
+	UINT32 old;				   														\
 																					\
 	offset = TOBYTE(offset & 0xfffffff0);											\
 																					\
-	old = (uint32_t)TMS34010_RDMEM_DWORD(offset) & ~(uint32_t)((MASK) << shift);		\
-	TMS34010_WRMEM_DWORD(offset, (uint32_t)(masked_data << shift) | old);				\
+	old = (UINT32)TMS34010_RDMEM_DWORD(offset) & ~(UINT32)((MASK) << shift);		\
+	TMS34010_WRMEM_DWORD(offset, (UINT32)(masked_data << shift) | old);				\
 	if (shift >= MAX)																\
 	{																				\
 		shift = 32 - shift;															\
-		old = (uint32_t)TMS34010_RDMEM_WORD(offset + 4) & ~((MASK) >> shift);			\
+		old = (UINT32)TMS34010_RDMEM_WORD(offset + 4) & ~((MASK) >> shift);			\
 		TMS34010_WRMEM_WORD(offset, (masked_data >> shift) | old);					\
 	}																				\
 
@@ -146,12 +146,12 @@ enum
 #define WFIELDMAC_32																\
 	if (offset & 0x0f)																\
 	{																				\
-		uint32_t shift = offset&0x0f;													\
-		uint32_t old;																	\
-		uint32_t hiword;																\
+		UINT32 shift = offset&0x0f;													\
+		UINT32 old;																	\
+		UINT32 hiword;																\
 		offset &= 0xfffffff0;														\
-		old =    ((uint32_t) TMS34010_RDMEM_DWORD (TOBYTE(offset     ))&(0xffffffff>>(0x20-shift)));	\
-		hiword = ((uint32_t) TMS34010_RDMEM_DWORD (TOBYTE(offset+0x20))&(0xffffffff<<shift));		\
+		old =    ((UINT32) TMS34010_RDMEM_DWORD (TOBYTE(offset     ))&(0xffffffff>>(0x20-shift)));	\
+		hiword = ((UINT32) TMS34010_RDMEM_DWORD (TOBYTE(offset+0x20))&(0xffffffff<<shift));		\
 		TMS34010_WRMEM_DWORD(TOBYTE(offset     ),(data<<      shift) |old);			\
 		TMS34010_WRMEM_DWORD(TOBYTE(offset+0x20),(data>>(0x20-shift))|hiword);		\
 	}																				\
@@ -165,7 +165,7 @@ enum
 **#################################################################################################*/
 
 #define RFIELDMAC(MASK,MAX)															\
-	uint32_t shift = offset & 0x0f;													\
+	UINT32 shift = offset & 0x0f;													\
 	offset = TOBYTE(offset & 0xfffffff0);											\
 																					\
 	if (shift >= MAX)																\
@@ -174,10 +174,10 @@ enum
 		ret = (TMS34010_RDMEM_WORD(offset) >> shift) & (MASK);						\
 
 #define RFIELDMAC_BIG(MASK,MAX)														\
-	uint32_t shift = offset & 0x0f;													\
+	UINT32 shift = offset & 0x0f;													\
 	offset = TOBYTE(offset & 0xfffffff0);											\
 																					\
-	ret = (uint32_t)TMS34010_RDMEM_DWORD(offset) >> shift;							\
+	ret = (UINT32)TMS34010_RDMEM_DWORD(offset) >> shift;							\
 	if (shift >= MAX)																\
 		ret |= (TMS34010_RDMEM_WORD(offset + 4) << (32 - shift));					\
 	ret &= MASK;																	\
@@ -185,9 +185,9 @@ enum
 #define RFIELDMAC_32																\
 	if (offset&0x0f)																\
 	{																				\
-		uint32_t shift = offset&0x0f;													\
+		UINT32 shift = offset&0x0f;													\
 		offset &= 0xfffffff0;														\
-		return (((uint32_t)TMS34010_RDMEM_DWORD (TOBYTE(offset     ))>>      shift) |	\
+		return (((UINT32)TMS34010_RDMEM_DWORD (TOBYTE(offset     ))>>      shift) |	\
 			            (TMS34010_RDMEM_DWORD (TOBYTE(offset+0x20))<<(0x20-shift)));\
 	}																				\
 	else																			\

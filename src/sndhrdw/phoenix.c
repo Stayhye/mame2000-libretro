@@ -54,7 +54,7 @@ static int tone1_vco1_cap;
 static int tone1_level;
 static int tone2_level;
 
-static uint32_t *poly18 = NULL;
+static UINT32 *poly18 = NULL;
 
 static INLINE int tone1_vco1(int samplerate)
 {
@@ -542,7 +542,7 @@ static INLINE int noise(int samplerate)
 	return sum;
 }
 
-static void phoenix_sound_update(int param, int16_t *buffer, int length)
+static void phoenix_sound_update(int param, INT16 *buffer, int length)
 {
 	int samplerate = Machine->sample_rate;
 
@@ -593,9 +593,9 @@ WRITE_HANDLER( phoenix_sound_control_b_w )
 int phoenix_sh_start(const struct MachineSound *msound)
 {
 	int i, j;
-	uint32_t shiftreg;
+	UINT32 shiftreg;
 
-	poly18 = (uint32_t *)malloc((1ul << (18-5)) * sizeof(uint32_t));
+	poly18 = (UINT32 *)malloc((1ul << (18-5)) * sizeof(UINT32));
 
 	if( !poly18 )
 		return 1;
@@ -603,7 +603,7 @@ int phoenix_sh_start(const struct MachineSound *msound)
     shiftreg = 0;
 	for( i = 0; i < (1ul << (18-5)); i++ )
 	{
-		uint32_t bits = 0;
+		UINT32 bits = 0;
 		for( j = 0; j < 32; j++ )
 		{
 			bits = (bits >> 1) | (shiftreg << 31);

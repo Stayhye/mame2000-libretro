@@ -78,8 +78,8 @@ int layers_offset[4];
 
 typedef struct
 	{
-	uint16_t tile_num;
-	uint16_t color;
+	UINT16 tile_num;
+	UINT16 color;
 	char priority;
 	int xpos;
 	int ypos;

@@ -19,7 +19,7 @@
 
 #define VEC_SHIFT 16
 
-uint8_t *cchasm_ram;
+UINT8 *cchasm_ram;
 
 static int xcenter, ycenter;
 

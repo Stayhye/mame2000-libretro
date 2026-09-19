@@ -5,7 +5,7 @@ SOUNDS      :=
 
 LIBRETRO_COMM_DIR := $(CORE_DIR)/src/libretro/libretro-common
 
-DEFS        := -DALIGN_INTS -DALIGN_SHORTS $(X86_DEFINES) -DMAME_UNDERCLOCK -DMAME_FASTSOUND -DENABLE_AUTOFIRE -DBIGCASE -D__LIBRETRO__
+DEFS        := -DGP2X -DALIGN_INTS -DALIGN_SHORTS $(X86_DEFINES) -DMAME_UNDERCLOCK -DMAME_FASTSOUND -DENABLE_AUTOFIRE -DBIGCASE -D__LIBRETRO__
 INCFLAGS    := -I$(CORE_DIR)/src -I$(CORE_DIR)/src/libretro -I$(LIBRETRO_COMM_DIR)/include
 
 # uncomment the following lines to include a CPU core
@@ -125,18 +125,20 @@ SOUNDS+=QSOUND@
 # the core object files (without target specific objects;
 # those are added in the target.mak files)
 
+ifneq ($(HAVE_RZLIB), 1)
 SOURCES_C   += $(CORE_DIR)/src/zlib/adler32.c \
-	       $(CORE_DIR)/src/zlib/compress.c \
-	       $(CORE_DIR)/src/zlib/crc32.c \
-	       $(CORE_DIR)/src/zlib/gzio.c \
-	       $(CORE_DIR)/src/zlib/deflate.c \
-	       $(CORE_DIR)/src/zlib/trees.c \
-	       $(CORE_DIR)/src/zlib/zutil.c \
-	       $(CORE_DIR)/src/zlib/inflate.c \
-	       $(CORE_DIR)/src/zlib/infback.c \
-	       $(CORE_DIR)/src/zlib/inftrees.c \
-	       $(CORE_DIR)/src/zlib/inffast.c \
-	       $(CORE_DIR)/src/zlib/uncompr.c
+				 $(CORE_DIR)/src/zlib/compress.c \
+				 $(CORE_DIR)/src/zlib/crc32.c \
+				 $(CORE_DIR)/src/zlib/gzio.c \
+				 $(CORE_DIR)/src/zlib/uncompr.c \
+				 $(CORE_DIR)/src/zlib/deflate.c \
+				 $(CORE_DIR)/src/zlib/trees.c \
+				 $(CORE_DIR)/src/zlib/zutil.c \
+				 $(CORE_DIR)/src/zlib/inflate.c \
+				 $(CORE_DIR)/src/zlib/infback.c \
+				 $(CORE_DIR)/src/zlib/inftrees.c \
+				 $(CORE_DIR)/src/zlib/inffast.c
+endif
 
 SOURCES_C += $(CORE_DIR)/src/version.c \
 				$(CORE_DIR)/src/info.c \
@@ -1806,6 +1808,13 @@ SOURCES_C += $(CORE_DIR)/src/libretro/libretro.c \
 				 $(CORE_DIR)/src/libretro/fileio.c \
 				 $(CORE_DIR)/src/libretro/config.c \
 				 $(CORE_DIR)/src/libretro/shared.c
+
+ifeq ($(WANT_LIBCO), 1)
+	DEFS += -DWANT_LIBCO -I$(LIBRETRO_COMM_DIR)/include
+	SOURCES_C += $(LIBRETRO_COMM_DIR)/libco/libco.c
+else
+	SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
+endif
 
 ifneq ($(STATIC_LINKING), 1)
 	SOURCES_C += $(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
