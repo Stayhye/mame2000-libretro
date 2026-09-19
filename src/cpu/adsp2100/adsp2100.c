@@ -40,8 +40,8 @@
 /* 16-bit registers that can be loaded signed or unsigned */
 typedef union
 {
-	uint16_t	u;
-	int16_t	s;
+	UINT16	u;
+	INT16	s;
 } ADSPREG16;
 
 
@@ -53,7 +53,7 @@ typedef union
 #else
 	struct { ADSPREG16 sr0, sr1; } srx;
 #endif
-	uint32_t sr;
+	UINT32 sr;
 } SHIFTRESULT;
 
 
@@ -65,7 +65,7 @@ typedef union
 #else
 	struct { ADSPREG16 mr0, mr1, mr2, mrzero; } mrx;
 #endif
-	uint64_t mr;
+	UINT64 mr;
 } MACRESULT;
 
 /* there are two banks of "core" registers */
@@ -101,55 +101,55 @@ typedef struct
 	ADSPCORE	r[2];
 
 	/* Memory addressing registers */
-	uint16_t		i[8];
-	int16_t		m[8];
-	uint16_t		l[8];
-	uint16_t		lmask[8];
-	uint16_t		base[8];
-	uint8_t		px;
+	UINT16		i[8];
+	INT16		m[8];
+	UINT16		l[8];
+	UINT16		lmask[8];
+	UINT16		base[8];
+	UINT8		px;
 
 	/* other CPU registers */
-	uint16_t		pc;
-	uint16_t		ppc;
-	uint16_t		loop;
-	uint8_t		loop_condition;
-	uint16_t		cntr;
+	UINT16		pc;
+	UINT16		ppc;
+	UINT16		loop;
+	UINT8		loop_condition;
+	UINT16		cntr;
 
 	/* status registers */
-	uint8_t		astat;
-	uint8_t		sstat;
-	uint8_t		mstat;
-	uint8_t		astat_clear;
-	uint8_t		idle;
+	UINT8		astat;
+	UINT8		sstat;
+	UINT8		mstat;
+	UINT8		astat_clear;
+	UINT8		idle;
 
 	/* stacks */
-	uint32_t		loop_stack[LOOP_STACK_DEPTH];
-	uint16_t		cntr_stack[CNTR_STACK_DEPTH];
-	uint16_t		pc_stack[PC_STACK_DEPTH];
-	uint8_t		stat_stack[STAT_STACK_DEPTH][3];
-	int8_t		pc_sp;
-	int8_t		cntr_sp;
-	int8_t		stat_sp;
-	int8_t		loop_sp;
+	UINT32		loop_stack[LOOP_STACK_DEPTH];
+	UINT16		cntr_stack[CNTR_STACK_DEPTH];
+	UINT16		pc_stack[PC_STACK_DEPTH];
+	UINT8		stat_stack[STAT_STACK_DEPTH][3];
+	INT8		pc_sp;
+	INT8		cntr_sp;
+	INT8		stat_sp;
+	INT8		loop_sp;
 
 	/* external I/O */
-	uint8_t		flagout;
-	uint8_t		flagin;
+	UINT8		flagout;
+	UINT8		flagin;
 #if SUPPORT_2101_EXTENSIONS
-	uint8_t		fl0;
-	uint8_t		fl1;
-	uint8_t		fl2;
+	UINT8		fl0;
+	UINT8		fl1;
+	UINT8		fl2;
 #endif
 
 	/* interrupt handling */
-	uint8_t		imask;
-	uint8_t		icntl;
+	UINT8		imask;
+	UINT8		icntl;
 #if SUPPORT_2101_EXTENSIONS
-	uint16_t		ifc;
+	UINT16		ifc;
 #endif
-    uint8_t    	irq_state[4];
-    uint8_t    	irq_latch[4];
-    int16_t		interrupt_cycles;
+    UINT8    	irq_state[4];
+    UINT8    	irq_latch[4];
+    INT16		interrupt_cycles;
     int			(*irq_callback)(int irqline);
 } adsp2100_Regs;
 
@@ -171,9 +171,9 @@ static ADSPCORE *core;
 
 static int chip_type = CHIP_TYPE_ADSP2100;
 
-static uint16_t *reverse_table = 0;
-static uint16_t *mask_table = 0;
-static uint8_t *condition_table = 0;
+static UINT16 *reverse_table = 0;
+static UINT16 *mask_table = 0;
+static UINT8 *condition_table = 0;
 
 #if SUPPORT_2101_EXTENSIONS
 static RX_CALLBACK adsp2105_rx_callback = 0;
@@ -181,7 +181,7 @@ static TX_CALLBACK adsp2105_tx_callback = 0;
 #endif
 
 #if TRACK_HOTSPOTS
-static uint32_t pcbucket[0x4000];
+static UINT32 pcbucket[0x4000];
 #endif
 
 
@@ -197,28 +197,28 @@ static void check_irqs(void);
 **	MEMORY ACCESSORS
 **#################################################################################################*/
 
-static INLINE uint16_t RWORD_DATA(uint16_t addr)
+static INLINE UINT16 RWORD_DATA(UINT16 addr)
 {
 	addr = (addr & 0x3fff) << 1;
 	return ADSP2100_RDMEM_WORD(ADSP2100_DATA_OFFSET + addr);
 }
 
-static INLINE void WWORD_DATA(uint16_t addr, uint16_t data)
+static INLINE void WWORD_DATA(UINT16 addr, UINT16 data)
 {
 	addr = (addr & 0x3fff) << 1;
 	ADSP2100_WRMEM_WORD(ADSP2100_DATA_OFFSET + addr, data);
 }
 
-static INLINE uint32_t RWORD_PGM(uint16_t addr)
+static INLINE UINT32 RWORD_PGM(UINT16 addr)
 {
 	addr = (addr & 0x3fff) << 2;
-	return *(uint32_t *)&OP_ROM[ADSP2100_PGM_OFFSET + addr] & 0x00ffffff;
+	return *(UINT32 *)&OP_ROM[ADSP2100_PGM_OFFSET + addr] & 0x00ffffff;
 }
 
-static INLINE void WWORD_PGM(uint16_t addr, uint32_t data)
+static INLINE void WWORD_PGM(UINT16 addr, UINT32 data)
 {
 	addr = (addr & 0x3fff) << 2;
-	*(uint32_t *)&OP_ROM[ADSP2100_PGM_OFFSET + addr] = data;
+	*(UINT32 *)&OP_ROM[ADSP2100_PGM_OFFSET + addr] = data;
 }
 
 #define ROPCODE() RWORD_PGM(adsp2100.pc)
@@ -238,7 +238,7 @@ static INLINE void WWORD_PGM(uint16_t addr, uint32_t data)
 
 static void check_irqs(void)
 {
-	uint8_t check;
+	UINT8 check;
 
 	if ( chip_type == CHIP_TYPE_ADSP2105 ) {
 		/* check IRQ2 */
@@ -558,11 +558,11 @@ static int create_tables(void)
 
 	/* allocate the tables */
 	if (!reverse_table)
-		reverse_table = (uint16_t *)malloc(0x4000 * sizeof(uint16_t));
+		reverse_table = (UINT16 *)malloc(0x4000 * sizeof(UINT16));
 	if (!mask_table)
-		mask_table = (uint16_t *)malloc(0x4000 * sizeof(uint16_t));
+		mask_table = (UINT16 *)malloc(0x4000 * sizeof(UINT16));
 	if (!condition_table)
-		condition_table = (uint8_t *)malloc(0x1000 * sizeof(uint8_t));
+		condition_table = (UINT8 *)malloc(0x1000 * sizeof(UINT8));
 
 	/* handle errors */
 	if (!reverse_table || !mask_table || !condition_table)
@@ -571,7 +571,7 @@ static int create_tables(void)
 	/* initialize the bit reversing table */
 	for (i = 0; i < 0x4000; i++)
 	{
-		uint16_t data = 0;
+		UINT16 data = 0;
 
 		data |= (i >> 13) & 0x0001;
 		data |= (i >> 11) & 0x0002;
@@ -695,7 +695,7 @@ int adsp2100_execute(int cycles)
 	/* core execution loop */
 	do
 	{
-		uint32_t op, temp;
+		UINT32 op, temp;
 
 		/* debugging */
 		adsp2100.ppc = adsp2100.pc;	/* copy PC to previous PC */
@@ -820,8 +820,8 @@ int adsp2100_execute(int cycles)
 			case 0x06:
 				/* 00000110 000xxxxx 00000000  DIVS */
 				{
-					uint16_t xop = (op >> 8) & 7;
-					uint16_t yop = (op >> 11) & 3;
+					UINT16 xop = (op >> 8) & 7;
+					UINT16 yop = (op >> 11) & 3;
 
 					xop = ALU_GETXREG_UNSIGNED(xop);
 					yop = ALU_GETYREG_UNSIGNED(yop);
@@ -835,8 +835,8 @@ int adsp2100_execute(int cycles)
 			case 0x07:
 				/* 00000111 00010xxx 00000000  DIVQ */
 				{
-					uint16_t xop = (op >> 8) & 7;
-					uint16_t res;
+					UINT16 xop = (op >> 8) & 7;
+					UINT16 res;
 
 					xop = ALU_GETXREG_UNSIGNED(xop);
 
@@ -1011,19 +1011,19 @@ int adsp2100_execute(int cycles)
 				break;
 			case 0x30: case 0x31: case 0x32: case 0x33:
 				/* 001100xx xxxxxxxx xxxxxxxx  load non-data register immediate (group 0) */
-				WRITE_REG(0, op & 15, (int16_t)(op >> 2) >> 2);
+				WRITE_REG(0, op & 15, (INT16)(op >> 2) >> 2);
 				break;
 			case 0x34: case 0x35: case 0x36: case 0x37:
 				/* 001101xx xxxxxxxx xxxxxxxx  load non-data register immediate (group 1) */
-				WRITE_REG(1, op & 15, (int16_t)(op >> 2) >> 2);
+				WRITE_REG(1, op & 15, (INT16)(op >> 2) >> 2);
 				break;
 			case 0x38: case 0x39: case 0x3a: case 0x3b:
 				/* 001110xx xxxxxxxx xxxxxxxx  load non-data register immediate (group 2) */
-				WRITE_REG(2, op & 15, (int16_t)(op >> 2) >> 2);
+				WRITE_REG(2, op & 15, (INT16)(op >> 2) >> 2);
 				break;
 			case 0x3c: case 0x3d: case 0x3e: case 0x3f:
 				/* 001111xx xxxxxxxx xxxxxxxx  load non-data register immediate (group 3) */
-				WRITE_REG(3, op & 15, (int16_t)(op >> 2) >> 2);
+				WRITE_REG(3, op & 15, (INT16)(op >> 2) >> 2);
 				break;
 			case 0x40: case 0x41: case 0x42: case 0x43: case 0x44: case 0x45: case 0x46: case 0x47:
 			case 0x48: case 0x49: case 0x4a: case 0x4b: case 0x4c: case 0x4d: case 0x4e: case 0x4f:
@@ -1609,7 +1609,7 @@ const char *adsp2100_info( void *context, int regnum )
 
 unsigned adsp2100_dasm(char *buffer, unsigned pc)
 {
-	sprintf(buffer, "$%06X", (unsigned int)RWORD_PGM(pc));
+	sprintf(buffer, "$%06X", RWORD_PGM(pc));
 	return 1;
 }
 
@@ -1656,7 +1656,7 @@ const char *adsp2105_info(void *context, int regnum)
 
 unsigned adsp2105_dasm(char *buffer, unsigned pc)
 {
-	sprintf(buffer, "$%06X", (unsigned int)RWORD_PGM(pc));
+	sprintf(buffer, "$%06X", RWORD_PGM(pc));
 	return 1;
 }
 

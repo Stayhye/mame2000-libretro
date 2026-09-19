@@ -754,10 +754,10 @@ reads from 0x0006, and only uses bit 1.
 	(it could be easily converted into an iterative one).
 	It's called shuffle because it mimics the shuffling of a deck of cards.
 */
-static void shuffle(uint16_t *buf,int len)
+static void shuffle(UINT16 *buf,int len)
 {
 	int i;
-	uint16_t t;
+	UINT16 t;
 
 	if (len == 2) return;
 
@@ -780,7 +780,7 @@ static void shuffle(uint16_t *buf,int len)
 /* helper function to join two 16-bit ROMs and form a 32-bit data stream */
 void konami_rom_deinterleave_2(int mem_region)
 {
-	shuffle((uint16_t *)memory_region(mem_region),memory_region_length(mem_region)/2);
+	shuffle((UINT16 *)memory_region(mem_region),memory_region_length(mem_region)/2);
 }
 
 /* helper function to join four 16-bit ROMs and form a 64-bit data stream */
@@ -868,7 +868,7 @@ WRITE_HANDLER( K007121_ctrl_1_w )
 
 void K007121_sprites_draw(int chip,struct osd_bitmap *bitmap,
 		const unsigned char *source,int base_color,int global_x_offset,int bank_base,
-		uint32_t pri_mask)
+		UINT32 pri_mask)
 {
 	const struct GfxElement *gfx = Machine->gfx[chip];
 	int flipscreen = K007121_flipscreen[chip];
@@ -1122,7 +1122,7 @@ static void tilemap_1_preupdate(void)
 	layer = 1;
 }
 
-static uint32_t K007342_scan(uint32_t col,uint32_t row,uint32_t num_cols,uint32_t num_rows)
+static UINT32 K007342_scan(UINT32 col,UINT32 row,UINT32 num_cols,UINT32 num_rows)
 {
 	/* logical (col,row) -> memory offset */
 	return (col & 0x1f) + ((row & 0x1f) << 5) + ((col & 0x20) << 5);
@@ -3030,75 +3030,59 @@ static unsigned char *K053247_ram;
 static int K053247_irq_enabled;
 
 
-int K053247_vh_start(int gfx_memory_region, int plane0, int plane1, int plane2, int plane3,
-        void (*callback)(int *code, int *color, int *priority))
+int K053247_vh_start(int gfx_memory_region,int plane0,int plane1,int plane2,int plane3,
+		void (*callback)(int *code,int *color,int *priority))
 {
-    int gfx_index;
-    unsigned char *gfx_rom;
-    
-    static struct GfxLayout spritelayout =
-    {
-        16, 16,
-        0,                /* filled in later */
-        4,
-        { 0, 0, 0, 0 },   /* filled in later */
-        { 2*4, 3*4, 0*4, 1*4, 6*4, 7*4, 4*4, 5*4,
-                10*4, 11*4, 8*4, 9*4, 14*4, 15*4, 12*4, 13*4 },
-        { 0*64, 1*64, 2*64, 3*64, 4*64, 5*64, 6*64, 7*64,
-                8*64, 9*64, 10*64, 11*64, 12*64, 13*64, 14*64, 15*64 },
-        128*8
-    };
+	int gfx_index;
+	static struct GfxLayout spritelayout =
+	{
+		16,16,
+		0,				/* filled in later */
+		4,
+		{ 0, 0, 0, 0 },	/* filled in later */
+		{ 2*4, 3*4, 0*4, 1*4, 6*4, 7*4, 4*4, 5*4,
+				10*4, 11*4, 8*4, 9*4, 14*4, 15*4, 12*4, 13*4 },
+		{ 0*64, 1*64, 2*64, 3*64, 4*64, 5*64, 6*64, 7*64,
+				8*64, 9*64, 10*64, 11*64, 12*64, 13*64, 14*64, 15*64 },
+		128*8
+	};
 
-    /* find first empty slot to decode gfx */
-    for (gfx_index = 0; gfx_index < MAX_GFX_ELEMENTS; gfx_index++)
-        if (Machine->gfx[gfx_index] == 0)
-            break;
-    if (gfx_index == MAX_GFX_ELEMENTS)
-        return 1;
 
-    /* Validate memory region pointer before parsing length or decoding */
-    gfx_rom = memory_region(gfx_memory_region);
-    if (!gfx_rom || ((unsigned int)gfx_rom & 0xF0000000))
-    {
-        logerror("K053247: Invalid or out-of-bounds GFX region pointer: %p\n", gfx_rom);
-        return 1;
-    }
+	/* find first empty slot to decode gfx */
+	for (gfx_index = 0; gfx_index < MAX_GFX_ELEMENTS; gfx_index++)
+		if (Machine->gfx[gfx_index] == 0)
+			break;
+	if (gfx_index == MAX_GFX_ELEMENTS)
+		return 1;
 
-    /* tweak the structure for the number of tiles we have */
-    spritelayout.total = memory_region_length(gfx_memory_region) / 128;
-    spritelayout.planeoffset[0] = plane0;
-    spritelayout.planeoffset[1] = plane1;
-    spritelayout.planeoffset[2] = plane2;
-    spritelayout.planeoffset[3] = plane3;
+	/* tweak the structure for the number of tiles we have */
+	spritelayout.total = memory_region_length(gfx_memory_region) / 128;
+	spritelayout.planeoffset[0] = plane0;
+	spritelayout.planeoffset[1] = plane1;
+	spritelayout.planeoffset[2] = plane2;
+	spritelayout.planeoffset[3] = plane3;
 
-    /* decode the graphics */
-    Machine->gfx[gfx_index] = decodegfx(gfx_rom, &spritelayout);
-    if (!Machine->gfx[gfx_index])
-        return 1;
+	/* decode the graphics */
+	Machine->gfx[gfx_index] = decodegfx(memory_region(gfx_memory_region),&spritelayout);
+	if (!Machine->gfx[gfx_index])
+		return 1;
 
-    /* set the color information */
-    Machine->gfx[gfx_index]->colortable = Machine->remapped_colortable;
-    Machine->gfx[gfx_index]->total_colors = Machine->drv->color_table_len / 16;
+	/* set the color information */
+	Machine->gfx[gfx_index]->colortable = Machine->remapped_colortable;
+	Machine->gfx[gfx_index]->total_colors = Machine->drv->color_table_len / 16;
 
-    K053247_memory_region = gfx_memory_region;
-    K053247_gfx = Machine->gfx[gfx_index];
-    K053247_callback = callback;
-    K053246_OBJCHA_line = CLEAR_LINE;
-    
-    K053247_ram = (unsigned char*)malloc(0x1000);
-    
-    /* Strict verification for sprite RAM pointer bounds */
-    if (!K053247_ram || ((unsigned int)K053247_ram & 0xF0000000)) 
-    {
-        if (K053247_ram) free(K053247_ram);
-        logerror("K053247: Fatal allocation error for K053247_ram: %p\n", K053247_ram);
-        return 1;
-    }
+	K053247_memory_region = gfx_memory_region;
+	K053247_gfx = Machine->gfx[gfx_index];
+	K053247_callback = callback;
+	K053246_OBJCHA_line = CLEAR_LINE;
+	K053247_ram = (unsigned char*)malloc(0x1000);
+	if (!K053247_ram) return 1;
 
-    memset(K053247_ram, 0, 0x1000);
+	memset(K053247_ram,0,0x1000);
 
-    return 0;
+	return 0;
 }
+
 void K053247_vh_stop(void)
 {
 	free(K053247_ram);
@@ -3919,18 +3903,18 @@ void K051316_tilemap_update_2(void)
 }
 
 
-void K051316_zoom_draw(int chip, struct osd_bitmap *bitmap,uint32_t priority)
+void K051316_zoom_draw(int chip, struct osd_bitmap *bitmap,UINT32 priority)
 {
-	uint32_t startx,starty;
+	UINT32 startx,starty;
 	int incxx,incxy,incyx,incyy;
 	struct osd_bitmap *srcbitmap = K051316_tilemap[chip]->pixmap;
 
-	startx = 256 * ((int16_t)(256 * K051316_ctrlram[chip][0x00] + K051316_ctrlram[chip][0x01]));
-	incxx  =        (int16_t)(256 * K051316_ctrlram[chip][0x02] + K051316_ctrlram[chip][0x03]);
-	incyx  =        (int16_t)(256 * K051316_ctrlram[chip][0x04] + K051316_ctrlram[chip][0x05]);
-	starty = 256 * ((int16_t)(256 * K051316_ctrlram[chip][0x06] + K051316_ctrlram[chip][0x07]));
-	incxy  =        (int16_t)(256 * K051316_ctrlram[chip][0x08] + K051316_ctrlram[chip][0x09]);
-	incyy  =        (int16_t)(256 * K051316_ctrlram[chip][0x0a] + K051316_ctrlram[chip][0x0b]);
+	startx = 256 * ((INT16)(256 * K051316_ctrlram[chip][0x00] + K051316_ctrlram[chip][0x01]));
+	incxx  =        (INT16)(256 * K051316_ctrlram[chip][0x02] + K051316_ctrlram[chip][0x03]);
+	incyx  =        (INT16)(256 * K051316_ctrlram[chip][0x04] + K051316_ctrlram[chip][0x05]);
+	starty = 256 * ((INT16)(256 * K051316_ctrlram[chip][0x06] + K051316_ctrlram[chip][0x07]));
+	incxy  =        (INT16)(256 * K051316_ctrlram[chip][0x08] + K051316_ctrlram[chip][0x09]);
+	incyy  =        (INT16)(256 * K051316_ctrlram[chip][0x0a] + K051316_ctrlram[chip][0x0b]);
 
 	startx -= (16 + K051316_offset[chip][1]) * incyx;
 	starty -= (16 + K051316_offset[chip][1]) * incyy;
@@ -3962,17 +3946,17 @@ void K051316_zoom_draw(int chip, struct osd_bitmap *bitmap,uint32_t priority)
 #endif
 }
 
-void K051316_zoom_draw_0(struct osd_bitmap *bitmap,uint32_t priority)
+void K051316_zoom_draw_0(struct osd_bitmap *bitmap,UINT32 priority)
 {
 	K051316_zoom_draw(0,bitmap,priority);
 }
 
-void K051316_zoom_draw_1(struct osd_bitmap *bitmap,uint32_t priority)
+void K051316_zoom_draw_1(struct osd_bitmap *bitmap,UINT32 priority)
 {
 	K051316_zoom_draw(1,bitmap,priority);
 }
 
-void K051316_zoom_draw_2(struct osd_bitmap *bitmap,uint32_t priority)
+void K051316_zoom_draw_2(struct osd_bitmap *bitmap,UINT32 priority)
 {
 	K051316_zoom_draw(2,bitmap,priority);
 }

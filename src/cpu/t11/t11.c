@@ -25,10 +25,10 @@ typedef struct
 	PAIR	ppc;	/* previous program counter */
     PAIR    reg[8];
     PAIR    psw;
-    uint16_t  op;
-    uint8_t	wait_state;
-    uint8_t   *bank[8];
-    int8_t    irq_state[4];
+    UINT16  op;
+    UINT8	wait_state;
+    UINT8   *bank[8];
+    INT8    irq_state[4];
     int		interrupt_cycles;
     int     (*irq_callback)(int irqline);
 } t11_Regs;
@@ -381,7 +381,7 @@ const char *t11_info( void *context, int regnum )
 
 unsigned t11_dasm(char *buffer, unsigned pc)
 {
-	sprintf( buffer, "$%04X", (unsigned int)cpu_readmem16lew_word(pc) );
+	sprintf( buffer, "$%04X", cpu_readmem16lew_word(pc) );
 	return 2;
 }
 

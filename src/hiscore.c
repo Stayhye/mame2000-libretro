@@ -19,7 +19,7 @@ char *db_filename = "hiscore.dat"; /* high score definition file */
 
 struct mem_range
 {
-	uint32_t cpu, addr, num_bytes, start_value, end_value;
+	UINT32 cpu, addr, num_bytes, start_value, end_value;
 	struct mem_range *next;
 };
 
@@ -59,7 +59,7 @@ int computer_readmem_byte(int cpu, int addr)
 
 /*****************************************************************************/
 
-static void copy_to_memory (int cpu, int addr, const uint8_t *source, int num_bytes)
+static void copy_to_memory (int cpu, int addr, const UINT8 *source, int num_bytes)
 {
 	int i;
 	for (i=0; i<num_bytes; i++)
@@ -68,7 +68,7 @@ static void copy_to_memory (int cpu, int addr, const uint8_t *source, int num_by
 	}
 }
 
-static void copy_from_memory (int cpu, int addr, uint8_t *dest, int num_bytes)
+static void copy_from_memory (int cpu, int addr, UINT8 *dest, int num_bytes)
 {
 	int i;
 	for (i=0; i<num_bytes; i++)
@@ -87,10 +87,10 @@ static void copy_from_memory (int cpu, int addr, uint8_t *dest, int num_bytes)
 	(0x00) is encountered.
 
 */
-static uint32_t hexstr2num (const char **pString)
+static UINT32 hexstr2num (const char **pString)
 {
 	const char *string = *pString;
-	uint32_t result = 0;
+	UINT32 result = 0;
 	if (string)
 	{
 		for(;;)
@@ -202,7 +202,7 @@ static void hs_load (void)
 		LOG(("loading...\n"));
 		while (mem_range)
 		{
-			uint8_t *data = (uint8_t*)malloc(mem_range->num_bytes);
+			UINT8 *data = (UINT8*)malloc(mem_range->num_bytes);
 			if (data)
 			{
 				/*	this buffer will almost certainly be small
@@ -229,7 +229,7 @@ static void hs_save (void)
 		LOG(("saving...\n"));
 		while (mem_range)
 		{
-			uint8_t *data = (uint8_t*)malloc(mem_range->num_bytes);
+			UINT8 *data = (UINT8*)malloc(mem_range->num_bytes);
 			if (data)
 			{
 				/*	this buffer will almost certainly be small
@@ -283,21 +283,6 @@ void hs_open (const char *name)
 					mem_range->num_bytes = hexstr2num (&pBuf);
 					mem_range->start_value = hexstr2num (&pBuf);
 					mem_range->end_value = hexstr2num (&pBuf);
-
-					/* Reject malformed entries before we use them.
-					 * A crafted hiscore.dat could otherwise supply a
-					 * gigantic num_bytes (causing malloc/fread of up
-					 * to 4 GiB inside hs_load) or an out-of-range cpu
-					 * index (OOB read of Machine->drv->cpu[] inside
-					 * MEMORY_READ / MEMORY_WRITE).  64 KiB is much
-					 * more than any real high-score region. */
-					if (mem_range->cpu >= (uint32_t)cpu_gettotalcpu() ||
-						mem_range->num_bytes == 0 ||
-						mem_range->num_bytes > 0x10000)
-					{
-						free(mem_range);
-						continue;
-					}
 
 					mem_range->next = NULL;
 					{

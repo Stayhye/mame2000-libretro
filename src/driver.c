@@ -1092,7 +1092,7 @@ V-V                           TP-027
 	DRIVER( dfeveron )	/* (c) 1998 Cave + Nihon System license */
 	DRIVER( esprade )	/* (c) 1998 Atlus/Cave */
 	DRIVER( uopoko )	/* (c) 1998 Cave + Jaleco license */
-	DRIVER( guwange )	/* (c) 1999 Atlus/Cave */
+TESTDRIVER( guwange )	/* (c) 1999 Atlus/Cave */
 
 	/* Kyugo games */
 	/* Kyugo only made four games: Repulse, Flash Gal, SRD Mission and Air Wolf. */

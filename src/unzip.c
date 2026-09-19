@@ -1,12 +1,15 @@
 #include "unzip.h"
 #include "mame.h"
-#include "osd_endian.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
 #include "zlib/zlib.h"
+
+/* public globals */
+int	gUnzipQuiet = 0;		/* flag controls error messages */
+
 
 #define ERROR_CORRUPT "The zipfile seems to be corrupt, please check it"
 #define ERROR_FILESYSTEM "Your filesystem seems to be corrupt, please check it"
@@ -18,7 +21,10 @@
 #endif
 
 /* Print a error message */
-static void errormsg(const char* extmsg, const char* usermsg, const char* zipname) {
+void errormsg(const char* extmsg, const char* usermsg, const char* zipname) {
+	/* Output to the user with no internal detail */
+	if (!gUnzipQuiet)
+		printf("Error in zipfile %s\n%s\n", zipname, usermsg);
 	/* Output to log file with all informations */
 	logerror("Error in zipfile %s: %s\n", zipname, extmsg);
 }
@@ -27,9 +33,19 @@ static void errormsg(const char* extmsg, const char* usermsg, const char* zipnam
    Unzip support
  ------------------------------------------------------------------------- */
 
-/* Zip headers are always little-endian on disk regardless of host. */
-#define read_word(p)  read_le16((const void *)(p))
-#define read_dword(p) read_le32((const void *)(p))
+/* Use these to avoid structure padding and byte-ordering problems */
+static UINT16 read_word (char *buf) {
+   unsigned char *ubuf = (unsigned char *) buf;
+
+   return ((UINT16)ubuf[1] << 8) | (UINT16)ubuf[0];
+}
+
+/* Use these to avoid structure padding and byte-ordering problems */
+static UINT32 read_dword (char *buf) {
+   unsigned char *ubuf = (unsigned char *) buf;
+
+   return ((UINT32)ubuf[3] << 24) | ((UINT32)ubuf[2] << 16) | ((UINT32)ubuf[1] << 8) | (UINT32)ubuf[0];
+}
 
 /* Locate end-of-central-dir sig in buffer and return offset
    out:
@@ -285,22 +301,10 @@ ZIP* openzip(const char* zipfile) {
      ==0 error
 */
 struct zipent* readzip(ZIP* zip) {
-	unsigned filename_length, extra_field_length, file_comment_length;
-	unsigned next_pos;
 
 	/* end of directory */
 	if (zip->cd_pos >= zip->size_of_cent_dir)
 		return 0;
-
-	/* A central-directory entry header is ZIPCFN (0x2e) bytes before the
-	 * variable-length filename starts.  Validate up-front that this header
-	 * itself is fully inside the buffer, otherwise reads below are OOB.
-	 * Use 64-bit math so the addition can't wrap. */
-	if ((uint64_t)zip->cd_pos + ZIPCFN > (uint64_t)zip->size_of_cent_dir)
-	{
-		errormsg("Truncated central directory entry", ERROR_CORRUPT, zip->zip);
-		return 0;
-	}
 
 	/* compile zipent info */
 	zip->ent.cent_file_header_sig = read_dword (zip->cd+zip->cd_pos+ZIPCENSIG);
@@ -323,37 +327,13 @@ struct zipent* readzip(ZIP* zip) {
 	zip->ent.external_file_attrib = read_dword (zip->cd+zip->cd_pos+ZIPEXT);
 	zip->ent.offset_lcl_hdr_frm_frst_disk = read_dword (zip->cd+zip->cd_pos+ZIPOFST);
 
-	/* Promote the three variable-length fields to 'unsigned' for the
-	 * arithmetic below; on 16-bit-int hosts this matters. */
-	filename_length     = zip->ent.filename_length;
-	extra_field_length  = zip->ent.extra_field_length;
-	file_comment_length = zip->ent.file_comment_length;
-
-	/* check filename length fits inside this directory entry */
-	if (filename_length > zip->size_of_cent_dir - zip->cd_pos - ZIPCFN)
-	{
-		errormsg("Invalid filename length in directory", ERROR_CORRUPT,zip->zip);
-		return 0;
-	}
-
-	/* Compute the next entry position with overflow protection.  Each of
-	 * the three variable fields is 16-bit, so their sum cannot overflow
-	 * 'unsigned' (which is at least 32-bit on any platform we target),
-	 * but the running cd_pos plus the header size and these fields
-	 * collectively can. */
-	{
-		uint64_t step = (uint64_t)ZIPCFN
-		              + (uint64_t)filename_length
-		              + (uint64_t)extra_field_length
-		              + (uint64_t)file_comment_length;
-		uint64_t check = (uint64_t)zip->cd_pos + step;
-		if (check > (uint64_t)zip->size_of_cent_dir)
-		{
-			errormsg("Central directory entry runs past end", ERROR_CORRUPT, zip->zip);
-			return 0;
-		}
-		next_pos = (unsigned)check;
-	}
+    /* check to see if filename length is illegally long (past the size of this directory
+       entry) */
+    if (zip->cd_pos + ZIPCFN + zip->ent.filename_length > zip->size_of_cent_dir)
+    {
+        errormsg("Invalid filename length in directory", ERROR_CORRUPT,zip->zip);
+        return 0;
+    }
 
 	/* copy filename */
 	if (zip->ent.name)
@@ -361,17 +341,12 @@ struct zipent* readzip(ZIP* zip) {
 		free(zip->ent.name);
 		zip->ent.name = 0;
 	}
-	zip->ent.name = (char*)malloc(filename_length + 1);
-	if (!zip->ent.name)
-	{
-		errormsg("Out of memory allocating filename", ERROR_CORRUPT, zip->zip);
-		return 0;
-	}
-	memcpy(zip->ent.name, zip->cd+zip->cd_pos+ZIPCFN, filename_length);
-	zip->ent.name[filename_length] = 0;
+	zip->ent.name = (char*)malloc(zip->ent.filename_length + 1);
+	memcpy(zip->ent.name, zip->cd+zip->cd_pos+ZIPCFN, zip->ent.filename_length);
+	zip->ent.name[zip->ent.filename_length] = 0;
 
 	/* skip to next entry in central dir */
-	zip->cd_pos = next_pos;
+	zip->cd_pos += ZIPCFN + zip->ent.filename_length + zip->ent.extra_field_length + zip->ent.file_comment_length;
 
 	return &zip->ent;
 }
@@ -456,8 +431,8 @@ int seekcompresszip(ZIP* zip, struct zipent* ent) {
 	}
 
 	{
-		uint16_t filename_length = read_word (buf+ZIPFNLN);
-		uint16_t extra_field_length = read_word (buf+ZIPXTRALN);
+		UINT16 filename_length = read_word (buf+ZIPFNLN);
+		UINT16 extra_field_length = read_word (buf+ZIPXTRALN);
 
 		/* calculate offset to data and fseek() there */
 		offset = ent->offset_lcl_hdr_frm_frst_disk + ZIPNAME + filename_length + extra_field_length;
@@ -513,10 +488,7 @@ static int inflate_file(FILE* in_file, unsigned in_size, unsigned char* out_data
 
 	in_buffer = (unsigned char*)malloc(INFLATE_INPUT_BUFFER_MAX+1);
 	if (!in_buffer)
-	{
-		inflateEnd(&d_stream);
 		return -1;
-	}
 
     for (;;)
 	{
@@ -806,13 +778,15 @@ int /* error */ load_zipped_file (const char* zipfile, const char* filename, uns
 
 		ent = &(zip->ent);
 
-		sprintf(crc,"%08x",(unsigned int)ent->crc32);
+		sprintf(crc,"%08x",ent->crc32);
 		if (equal_filename(ent->name, filename) ||
 				(ent->crc32 && !strcmp(crc, filename)))
 		{
 			*length = ent->uncompressed_size;
 			*buf = (unsigned char*)malloc( *length );
 			if (!*buf) {
+				if (!gUnzipQuiet)
+					printf("load_zipped_file(): Unable to allocate %d bytes of RAM\n",*length);
 				cache_closezip(zip);
 				return -1;
 			}

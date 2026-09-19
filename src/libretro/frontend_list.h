@@ -9,7 +9,7 @@ struct fe_driver {
 	int available;
 };
 
-#define NUMGAMES 2271
+#define NUMGAMES 2270
 
 struct fe_driver fe_drivers[NUMGAMES] = {
 
@@ -792,7 +792,6 @@ struct fe_driver fe_drivers[NUMGAMES] = {
 { "Gunforce - Battle Fire Engulfed Terror Island (World)"                                                 ,"gunforce"     , "mame", 3, 0 } ,												
 { "Gururin"                                                                                               ,"gururin"      , "neomame", 3, 0 } ,												
 { "Guttang Gottong"                                                                                       ,"gutangtn"     , "mame", 3, 0 } ,												
-{ "Guwange"                                                                                               ,"guwange"      , "mame", 3, 0 } ,
 { "Guzzler"                                                                                               ,"guzzler"      , "mame", 3, 0 } ,												
 { "Gypsy Juggler"                                                                                         ,"gypsyjug"     , "mame", 3, 0 } ,												
 { "Gyrodine"                                                                                              ,"gyrodine"     , "mame", 3, 0 } ,												

@@ -137,7 +137,7 @@ WRITE_HANDLER( suna8_banked_spriteram_w )
 WRITE_HANDLER( brickzn_banked_paletteram_w )
 {
 	int r,g,b;
-	uint16_t rgb;
+	UINT16 rgb;
 	offset += suna8_palettebank * 0x200;
 	paletteram[offset] = data;
 	rgb = (paletteram[offset&~1] << 8) + paletteram[offset|1];

@@ -45,7 +45,7 @@ enum {
  * the names from the enum a CPU core defines for it's registers,
  * to get or set the contents of the memory pointed to by a stack pointer.
  * You can specify the n'th element on the stack by (REG_SP_CONTENTS-n),
- * ie. lower negative values. The actual element size (uint16_t or uint32_t)
+ * ie. lower negative values. The actual element size (UINT16 or UINT32)
  * depends on the CPU core.
  * This is also used to replace the cpu_geturnpc() function.
  */
@@ -303,22 +303,7 @@ __attribute__ ((__aligned__ (32)))
 extern struct cpu_interface cpuintf[];
 
 void cpu_init(void);
-/* Re-entrant CPU scheduling.  cpu_run_init() allocates per-CPU
- * context buffers and primes machine state; each cpu_run_step()
- * runs one frame's worth of timer-driven CPU dispatch and returns
- * when osd_update_video_and_audio()'s yield hook fires (or when
- * usres is set); cpu_run_exit() tears down.  Replaces the historical
- * monolithic cpu_run() that ran the entire game inline. */
-void cpu_run_init(void);
-void cpu_run_step(void);
-void cpu_run_exit(void);
-
-/* Game-pause hook (defined in src/cpuintrf.c).  See mame_pause() in
- * src/usrintrf.h for the public setter.  When non-NULL, mame_run_-
- * one_frame() calls pause_action() instead of cpu_run_step(), and
- * updatescreen() picks osd_update_silent_stream() over sound_-
- * update().  Mirrors mame2003-libretro's pause_action global. */
-extern void (*pause_action)(void);
+void cpu_run(void);
 
 /* optional watchdog */
 WRITE_HANDLER( watchdog_reset_w );

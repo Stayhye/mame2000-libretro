@@ -326,12 +326,12 @@ struct ipd inputport_defaults_backup[sizeof(inputport_defaults)/sizeof(struct ip
 /***************************************************************************/
 /* Generic IO */
 
-static int readint(void *f,uint32_t *num)
+static int readint(void *f,UINT32 *num)
 {
 	unsigned i;
 
 	*num = 0;
-	for (i = 0;i < sizeof(uint32_t);i++)
+	for (i = 0;i < sizeof(UINT32);i++)
 	{
 		unsigned char c;
 
@@ -345,28 +345,28 @@ static int readint(void *f,uint32_t *num)
 	return 0;
 }
 
-static void writeint(void *f,uint32_t num)
+static void writeint(void *f,UINT32 num)
 {
 	unsigned i;
 
-	for (i = 0;i < sizeof(uint32_t);i++)
+	for (i = 0;i < sizeof(UINT32);i++)
 	{
 		unsigned char c;
 
 
-		c = (num >> 8 * (sizeof(uint32_t)-1)) & 0xff;
+		c = (num >> 8 * (sizeof(UINT32)-1)) & 0xff;
 		osd_fwrite(f,&c,1);
 		num <<= 8;
 	}
 }
 
-static int readword(void *f,uint16_t *num)
+static int readword(void *f,UINT16 *num)
 {
 	unsigned i;
 	int res;
 
 	res = 0;
-	for (i = 0;i < sizeof(uint16_t);i++)
+	for (i = 0;i < sizeof(UINT16);i++)
 	{
 		unsigned char c;
 
@@ -381,16 +381,16 @@ static int readword(void *f,uint16_t *num)
 	return 0;
 }
 
-static void writeword(void *f,uint16_t num)
+static void writeword(void *f,UINT16 num)
 {
 	unsigned i;
 
-	for (i = 0;i < sizeof(uint16_t);i++)
+	for (i = 0;i < sizeof(UINT16);i++)
 	{
 		unsigned char c;
 
 
-		c = (num >> 8 * (sizeof(uint16_t)-1)) & 0xff;
+		c = (num >> 8 * (sizeof(UINT16)-1)) & 0xff;
 		osd_fwrite(f,&c,1);
 		num <<= 8;
 	}
@@ -403,19 +403,13 @@ static void writeword(void *f,uint16_t num)
 static int seq_read_ver_8(void* f, InputSeq* seq)
 {
 	int j,len;
-	uint32_t i;
-	uint16_t w;
+	UINT32 i;
+	UINT16 w;
 
 	if (readword(f,&w) != 0)
 		return -1;
 
 	len = w;
-	/* Reject sequences longer than the fixed-size InputSeq buffer.  A
-	 * crafted .cfg file claiming len = 65535 would otherwise write 65535
-	 * InputCodes past the end of the caller's stack-allocated InputSeq
-	 * array (SEQ_MAX = 16). */
-	if (len > SEQ_MAX)
-		return -1;
 	seq_set_0(seq);
 	for(j=0;j<len;++j)
 	{
@@ -487,7 +481,7 @@ static void load_default_keys(void)
 
 		for (;;)
 		{
-			uint32_t type;
+			UINT32 type;
 			InputSeq def_seq;
 			InputSeq seq;
 			int i;
@@ -550,8 +544,8 @@ static void save_default_keys(void)
 
 static int input_port_read_ver_8(void *f,struct InputPort *in)
 {
-	uint32_t i;
-	uint16_t w;
+	UINT32 i;
+	UINT16 w;
 	if (readint(f,&i) != 0)
 		return -1;
 	in->type = i;

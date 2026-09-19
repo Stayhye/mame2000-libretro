@@ -8,17 +8,6 @@ extern int isIpad;
 extern int emulated_width;
 extern int emulated_height;
 extern int safe_render_path;
-
-extern unsigned frameskip_type;
-extern unsigned frameskip_threshold;
-extern unsigned frameskip_counter;
-extern unsigned frameskip_interval;
-
-extern int retro_audio_buff_active;
-extern unsigned retro_audio_buff_occupancy;
-extern int retro_audio_buff_underrun;
-extern int should_skip_frame;
-
 int iOS_exitPause = 0;
 int iOS_cropVideo = 0;
 int iOS_aspectRatio = 0;
@@ -30,6 +19,9 @@ dirtygrid grid1;
 dirtygrid grid2;
 char *dirty_old=grid1;
 char *dirty_new=grid2;
+
+/* in msdos/sound.c */
+//int msdos_update_audio(void);
 
 /* specialized update_screen functions defined in blit.c */
 /* dirty mode 1 (VIDEO_SUPPORTS_DIRTY) */
@@ -44,18 +36,6 @@ void blitscreen_dirty0_palettized16(struct osd_bitmap *bitmap);
 static void update_screen_dummy(struct osd_bitmap *bitmap);
 void (*update_screen)(struct osd_bitmap *bitmap) = update_screen_dummy;
 
-/* Bitmap-direct fast path.  When the running game's blit would be a
- * pure memcpy (no palette LUT, no rotation, no offsetting, no
- * cropping) we can skip the blit entirely and hand the MAME screen
- * bitmap straight to the libretro frontend.  osd_update_video_and_audio
- * decides per-frame whether the preconditions hold, sets these
- * globals, and skips update_screen() if it does.  retro_run reads
- * these globals to choose which pointer/pitch to pass to video_cb.
- * Reset to NULL at the start of every frame so a previous frame's
- * decision never leaks into the next one. */
-const void *mame2000_direct_frame_data  = 0;
-size_t      mame2000_direct_frame_pitch = 0;
-
 static int video_depth,video_fps;
 static int modifiable_palette;
 static int screen_colors;
@@ -64,7 +44,7 @@ static unsigned int *dirtycolor;
 static int dirtypalette;
 static int dirty_bright;
 static int bright_lookup[256];
-extern uint32_t *palette_16bit_lookup;
+extern UINT32 *palette_16bit_lookup;
 
 int frameskip,autoframeskip;
 #define FRAMESKIP_LEVELS 12
@@ -74,7 +54,7 @@ int wait_vsync;
 int vsync_frame_rate;
 int skiplines;
 int skipcolumns;
-int use_dirty = -1;
+int use_dirty;
 float osd_gamma_correction = 1.0;
 int brightness;
 float brightness_paused_adjust;
@@ -116,8 +96,13 @@ int video_aspect=0;
 const int safety = 16;
 
 
+UINT32 *ps2_palette;
+UINT8 *ps2_buffer;
+// struct retro_hw_ps2_insets padding;
+
 struct osd_bitmap *osd_alloc_bitmap(int width,int height,int depth)
 {
+	printf("osd_alloc_bitmap(%i,%i)\n", width, height);
 	struct osd_bitmap *bitmap;
 
 
@@ -148,7 +133,8 @@ struct osd_bitmap *osd_alloc_bitmap(int width,int height,int depth)
 		/* clear ALL bitmap, including safety area, to avoid garbage on right */
 		/* side of screen is width is not a multiple of 4 */
 		memset(bm,0,(height + 2 * safety) * rowlen);
-
+		printf("*********** width %i\n", (rdwidth + 2 * safety));
+		printf("*********** height %i\n", (height + 2 * safety));
 		if ((bitmap->line = (unsigned char**)malloc((height + 2 * safety) * sizeof(unsigned char *))) == 0)
 		{
 			free(bm);
@@ -252,34 +238,151 @@ static INLINE void swap_dirty(void)
 /*
  * This function tries to find the best display mode.
  */
-static void select_display_mode(int width, int height, int depth, int attributes, int orientation)
+static void select_display_mode(int width,int height,int depth,int attributes,int orientation)
 {
-    // Strip legacy iOS/GP2X branching overhead and optimize resolution bounds for the PS2 Graphics Synthesizer
-    emulated_width = width;
-    emulated_height = height;
+	/* 16 bit color is supported only by VESA modes */
+	if (depth == 16 || depth == 32)
+	{
+		logerror("Game needs %d-bit colors.\n",depth);
+	}
 
-    if (!gfx_width && !gfx_height) {
-        gfx_width = width;
-        gfx_height = height;
-    }
+	emulated_width = width;
+	emulated_height = height;
 
-    // Force lower internal resolution for vector games to prevent GS fill-rate bottlenecks and maintain 60 FPS
-    if (vector_game) {
-        gfx_width = 320;
-        gfx_height = 240;
-        emulated_width = 320;
-        emulated_height = 240;
-    }
 
-    // Respect explicit video scaling requests without redundant checks
-    if (video_scale) {
-        gfx_width = width;
-        gfx_height = height;
-    }
+	if (!gfx_width && !gfx_height)//no aspect ratio
+	{
+		gfx_width = width;
+		gfx_height = height;
+	}
 
-    // Apply hardware video mode update
-    gp2x_set_video_mode(16, gfx_width, gfx_height);
+	if(iOS_fixedRes == 1)
+	{
+		gfx_width = 320;
+		gfx_height = 240;
+		emulated_width = 320;
+		emulated_height = 240;
+	}
+	else if(iOS_fixedRes == 2)
+	{
+		gfx_width = 240;
+		gfx_height = 320;
+		emulated_width = 240;
+		emulated_height = 320;
+	}else if(iOS_fixedRes == 3)
+	{
+		gfx_width = 640;
+		gfx_height = 480;
+		emulated_width = 640;
+		emulated_height = 480;
+	}else if(iOS_fixedRes == 4)
+	{
+		gfx_width = 480;
+		gfx_height = 640;
+		emulated_width = 480;
+		emulated_height = 640;
+	}
+
+
+	if(iOS_cropVideo)
+	{
+
+		gfx_width = width;
+		gfx_height = height;
+
+		int rx = iOS_cropVideo == 1 ? 4 : 3;
+		int ry = iOS_cropVideo == 1 ? 3 : 4;
+
+
+		//double ratio = 4.0/3.0;
+		//printf("%d %d \n",width,height);
+
+		int new_width = //gfx_height * ratio;
+		            ((((gfx_height*rx)/ry)+7)&~7);
+
+		if(new_width>gfx_width)
+		{
+			gfx_height = //gfx_width / ratio;
+					((((gfx_width*ry)/rx)+7)&~7);
+		}
+		else
+ 		    gfx_width = new_width;
+
+		emulated_width = gfx_width;
+		emulated_height = gfx_height;
+
+		//printf("%d %d\n",gfx_width,gfx_height);
+	}
+
+/*
+	if(iOS_aspectRatio)//aspect ratio
+	{
+
+		gfx_width = width;
+		gfx_height = height;
+
+		//double ratio = 4.0/3.0;//isIpad ? 1024.0/768.0 :480.0/320.0;
+
+		//printf("%d %d %f\n",width,height,ratio);
+
+		int done = 0;
+
+		iOS_43 = width > height;
+
+		int rx = iOS_43 ? 4 : 3;
+		int ry = iOS_43 ? 3 : 4;
+
+		// Try adjusting width to be proportional to height
+		int newWidth = //(int) (ratio * gfx_height);
+				((((gfx_height*rx)/ry)+7)&~7);
+
+		if (newWidth >= gfx_width) {
+			gfx_width = newWidth;
+			done = 1;
+		}
+
+		// Try adjusting height to be proportional to width
+		if (!done) {
+			int newHeight = //(int) (gfx_width / ratio);
+					((((gfx_width*ry)/rx)+7)&~7);
+
+			if (newHeight >= gfx_height) {
+				gfx_height = newHeight;
+			}
+		}
+
+		//printf("%d %d\n",gfx_width,gfx_height);
+	}
+*/
+	/* Video hardware scaling */
+	if (video_scale)
+	{
+		gfx_width=width;
+		gfx_height=height;
+	}
+
+	/* vector games use 640x480 as default */
+	if (vector_game && !iOS_fixedRes)
+	{
+		if(safe_render_path)
+		{
+		   gfx_width = 640;
+		   gfx_height = 480;
+		   emulated_width = 640;
+		   emulated_height = 480;
+		}
+		else
+		{
+		   gfx_width = 320;
+		   gfx_height = 240;
+		   emulated_width = 320;
+		   emulated_height = 240;
+		}
+	}
+
+	gp2x_set_video_mode(16,gfx_width,gfx_height);
 }
+
 
 
 /* center image inside the display based on the visual area */
@@ -368,10 +471,11 @@ Returns 0 on success.
 */
 int osd_create_display(int width,int height,int depth,int fps,int attributes,int orientation)
 {
-	printf("width %d, height %d\n", width,height);
+	logerror("width %d, height %d\n", width,height);
 
 	video_depth = depth;
 	video_fps = fps;
+
 	brightness = 100;
 	brightness_paused_adjust = 1.0;
 	dirty_bright = 1;
@@ -415,9 +519,11 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 	}
 
 	/* Mark the dirty buffers as dirty */
+
 	if (use_dirty)
 	{
 		if (vector_game)
+			/* vector games only use one dirty buffer */
 			init_dirty (0);
 		else
 			init_dirty(1);
@@ -436,7 +542,7 @@ int osd_set_display(int width,int height,int depth,int attributes,int orientatio
 
 	vsync_frame_rate = video_fps;
 
-	return 1; // Force a successful return so video emulation starts properly
+	return 1;
 }
 
 /* shut up the display */
@@ -460,9 +566,11 @@ int osd_allocate_colors(unsigned int totalcolors,const unsigned char *palette,un
 		screen_colors += 2;
 	else screen_colors = 256;
 
+	ps2_palette = (unsigned int*)malloc(screen_colors * sizeof(int));
+
 	dirtycolor = (unsigned int*)malloc(screen_colors * sizeof(int));
 	current_palette = (unsigned char*)malloc(3 * screen_colors * sizeof(unsigned char));
-	palette_16bit_lookup = (uint32_t*)malloc(screen_colors * sizeof(palette_16bit_lookup[0]));
+	palette_16bit_lookup = (UINT32*)malloc(screen_colors * sizeof(palette_16bit_lookup[0]));
 	if (dirtycolor == 0 || current_palette == 0 || palette_16bit_lookup == 0)
 		return 1;
 
@@ -494,6 +602,7 @@ int osd_allocate_colors(unsigned int totalcolors,const unsigned char *palette,un
 	{
 		if (video_depth == 8 && totalcolors >= 255)
 		{
+			printf("FJTRUJY: More than 256\n");
 			int bestblack,bestwhite;
 			int bestblackscore,bestwhitescore;
 
@@ -646,6 +755,7 @@ void osd_get_pen(int pen,unsigned char *red, unsigned char *green, unsigned char
 
 static void update_screen_dummy(struct osd_bitmap *bitmap)
 {
+	logerror("msdos/video.c: undefined update_screen() function for %d x %d!\n",xmultiply,ymultiply);
 }
 
 static INLINE void pan_display(void)
@@ -692,7 +802,7 @@ static INLINE void pan_display(void)
 
 int osd_skip_this_frame(void)
 {
-   return should_skip_frame;
+   return 0;
 }
 
 /* Update the display. */
@@ -701,8 +811,13 @@ void osd_update_video_and_audio(struct osd_bitmap *bitmap)
 	int i;
 	int have_to_clear_bitmap = 0;
 
+
+	/* update audio */
+	//msdos_update_audio();
+
 	if (bitmap->depth == 8)
 	{
+		// printf("8 Bits\n");
 		if (dirty_bright)
 		{
 			dirty_bright = 0;
@@ -733,6 +848,17 @@ void osd_update_video_and_audio(struct osd_bitmap *bitmap)
 						b = bright_lookup[b];
 					}
 					gp2x_video_color8(i,r,g,b);
+
+					int index_to_write = i;
+					int modi = i & 63;
+   					if ((modi >= 8 && modi < 16) || (modi >= 40 && modi < 48)) {
+      					index_to_write += 8;
+   					} else if ((modi >= 16 && modi < 24) || (modi >= 48 && modi < 56)) {
+         				index_to_write -= 8;
+   					}
+
+					int color = (b << 16) | (g << 8) | (r << 0);
+					ps2_palette[index_to_write] = color;
 				}
 			}
 			gp2x_video_setpalette();
@@ -740,6 +866,7 @@ void osd_update_video_and_audio(struct osd_bitmap *bitmap)
 	}
 	else
 	{
+		// printf("16 Bits\n");
 		if (dirty_bright)
 		{
 			dirty_bright = 0;
@@ -777,90 +904,9 @@ void osd_update_video_and_audio(struct osd_bitmap *bitmap)
 		}
 	}
 
-		/* Decide whether to drop the current frame BEFORE doing any
-		 * blit-equivalent work, so a skipped frame costs only the
-		 * bookkeeping below.  Previously this decision lived at the
-		 * bottom of the function (after update_screen had already
-		 * run), which meant every frame paid the full blit cost
-		 * regardless of whether retro_run was about to discard it
-		 * with video_cb(NULL, ...).  The decision is purely a
-		 * function of frameskip_type, frameskip_counter and the
-		 * libretro audio-buffer hints reported by the frontend;
-		 * none of those are touched by update_screen, so moving
-		 * the block earlier is equivalent. */
-		should_skip_frame = 0;
-		if ((frameskip_type > 0) &&
-		    retro_audio_buff_active)
-		{
-			int skip_frame;
-
-			switch (frameskip_type)
-			{
-			case 1: /* auto */
-				skip_frame = retro_audio_buff_underrun;
-				break;
-			case 2: /* threshold */
-				skip_frame = (retro_audio_buff_occupancy < frameskip_threshold);
-				break;
-			default:
-				skip_frame = 0;
-				break;
-			}
-
-			if (skip_frame)
-			{
-				if(frameskip_counter < frameskip_interval)
-				{
-					should_skip_frame = 1;
-					frameskip_counter++;
-				}
-				else
-					frameskip_counter = 0;
-			}
-			else
-				frameskip_counter = 0;
-		}
-
-		if (should_skip_frame)
-		{
-			/* Frame will be dropped: retro_run sees should_skip_frame
-			 * first and calls video_cb(NULL, ...), so neither the
-			 * blit's output (gp2x_screen15) nor the bitmap-direct
-			 * pointer is read.  Skip both to save a full memcpy or
-			 * pointer probe.  Zero the direct-frame state for
-			 * hygiene; the next non-skipped frame sets it afresh. */
-			mame2000_direct_frame_data  = 0;
-		}
-		/* Decide whether this frame can take the bitmap-direct path.
-		 * Preconditions reflect the assumption that the existing
-		 * color16 blit is now a pure row-by-row memcpy with no
-		 * conversion: if the MAME scrbitmap's visible area exactly
-		 * matches the libretro frame size and is at offset (0,0),
-		 * the memcpy is redundant and we can deliver the bitmap
-		 * pointer to the frontend instead.  The bitmap's row stride
-		 * is wider than the visible width (osd_alloc_bitmap rounds
-		 * width up to a quadword and pads with `safety` pixels on
-		 * each side); libretro's video_cb accepts an arbitrary
-		 * pitch, so passing the bitmap stride here is correct. */
-		else if (   video_depth          == 16
-		    && !modifiable_palette
-		    && !vector_game
-		    && gfx_xoffset          == 0
-		    && gfx_yoffset          == 0
-		    && skiplines            == 0
-		    && skipcolumns          == 0
-		    && gfx_display_columns  == gfx_width
-		    && gfx_display_lines    == gfx_height)
-		{
-			mame2000_direct_frame_data  = bitmap->line[0];
-			mame2000_direct_frame_pitch = bitmap->line[1] - bitmap->line[0];
-		}
-		else
-		{
-			mame2000_direct_frame_data  = 0;
-			/* copy the bitmap to screen memory */
-			update_screen(bitmap);
-		}
+		/* copy the bitmap to screen memory */
+		// update_screen(bitmap);
+		ps2_buffer = bitmap->line[0];
 
 		if (have_to_clear_bitmap)
 			osd_clearbitmap(bitmap);
@@ -927,9 +973,15 @@ void osd_pause(int paused)
 	int i;
 
 	if (paused)
+	{
+		//app_MuteSound();
 		brightness_paused_adjust = 0.65;
+	}
 	else
+	{
+		//app_DemuteSound();
 		brightness_paused_adjust = 1.0;
+	}
 
 	for (i = 0;i < screen_colors;i++)
 		dirtycolor[i] = 1;

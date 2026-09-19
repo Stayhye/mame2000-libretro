@@ -3,6 +3,7 @@
 #include "driver.h"
 #include "ui_text.h" /* LBO 042400 */
 #include "artwork.h"
+#include "port_wrapper.h"
 
 extern int safe_render_path;
 extern int iOS_fixedRes;
@@ -34,124 +35,14 @@ extern int spriteram_size,spriteram_2_size;
 
 int init_machine(void);
 void shutdown_machine(void);
-/* Re-entrant game lifecycle: see mame.h. */
-int mame_start_game(int game);
-void mame_run_one_frame(void);
-void mame_end_game(void);
-static int run_machine_init(void);
-static void run_machine_exit(void);
+int run_machine(void);
 
 void overlay_free(void);
 void backdrop_free(void);
 void overlay_remap(void);
 void overlay_draw(struct osd_bitmap *dest,struct osd_bitmap *source);
 
-/* The FM interface structs (YM2151interface, YM3812interface and friends)
- * all begin { int num; int baseclock; ... }, so this two-field prefix is
- * enough to read a chip's clock from its sound_interface pointer.  Chips
- * whose clock/rate field sits at a different offset (C140, VLM5030,
- * namco_interface) are handled separately by reading the first int. */
-struct fixed_rate_intf { int num; int baseclock; };
-
-/* Some sound sources emit audio at a fixed rate derived from their own
- * clock rather than at whatever output rate the machine is configured
- * for; those normally have to be rate-converted before mixing.  When
- * such a source is the ONLY one with a fixed rate (and there is just
- * one distinct fixed rate across the whole machine), we can instead run
- * the entire audio pipeline at that rate, so no conversion happens
- * inside the core and the samples reach the frontend untouched.
- *
- * Returns that rate, or 0 when it cannot be pinned down (no fixed-rate
- * source, more than one distinct rate, or a fixed-rate source whose
- * rate we do not compute here), in which case the configured rate is
- * used as before. */
-static int game_fixed_output_rate(void)
-{
-	int i;
-	int rate = 0;
-
-	for (i = 0; i < MAX_SOUND && Machine->drv->sound[i].sound_type != 0; i++)
-	{
-		const struct fixed_rate_intf *cfg =
-			(const struct fixed_rate_intf *)Machine->drv->sound[i].sound_interface;
-		int chiprate = 0;
-
-		switch (Machine->drv->sound[i].sound_type)
-		{
-#if (HAS_YM2151 || HAS_YM2151_ALT)
-			case SOUND_YM2151:
-				if (cfg) chiprate = cfg->baseclock / 64;
-				break;
-#endif
-#if (HAS_YM3812)
-			case SOUND_YM3812:
-#endif
-#if (HAS_YM3526)
-			case SOUND_YM3526:
-#endif
-#if (HAS_Y8950)
-			case SOUND_Y8950:
-#endif
-#if (HAS_YM2413)
-			case SOUND_YM2413:
-#endif
-#if (HAS_YM3812 || HAS_YM3526 || HAS_Y8950 || HAS_YM2413)
-				if (cfg) chiprate = cfg->baseclock / 72;
-				break;
-#endif
-#if (HAS_C140)
-			/* C140interface: { int frequency; int region; ... }.  Read the
-			 * first int directly rather than through fixed_rate_intf. */
-			case SOUND_C140:
-				if (cfg) chiprate = *(const int *)cfg;
-				break;
-#endif
-#if (HAS_VLM5030)
-			/* VLM5030interface: { int baseclock; ... } */
-			case SOUND_VLM5030:
-				if (cfg) chiprate = (*(const int *)cfg) / 440;
-				break;
-#endif
-#if (HAS_NAMCO)
-			/* namco_interface: { int samplerate; int voices; ... } */
-			case SOUND_NAMCO:
-				if (cfg)
-				{
-					int nc = *(const int *)cfg;
-					if (nc > 0)
-					{
-						/* base rate doubled until it reaches the 192000 internal rate,
-						 * then divided by the 4x oversampling factor */
-						while (nc < 192000) nc *= 2;
-						chiprate = nc / 4;
-					}
-				}
-				break;
-#endif
-			/* Content whose rate is decided at runtime: leave the
-			 * choice to the configured rate. */
-			case SOUND_CUSTOM:
-#if (HAS_SAMPLES)
-			case SOUND_SAMPLES:
-#endif
-				return 0;
-			default:
-				/* Class 1: already runs at the output rate; nothing to pin. */
-				continue;
-		}
-
-		if (chiprate <= 0)
-			return 0;
-		if (rate == 0)
-			rate = chiprate;
-		else if (rate != chiprate)
-			return 0; /* two different fixed rates -> one must still be converted */
-	}
-
-	return rate;
-}
-
-int mame_start_game(int game)
+int run_game(int game)
 {
 	int err;
 
@@ -168,13 +59,13 @@ int mame_start_game(int game)
 			(options.color_depth != 8 && (Machine->gamedrv->flags & GAME_REQUIRES_16BIT)))
 		Machine->color_depth = 16;
 	else
-		Machine->color_depth = 16;
+		Machine->color_depth = 8;
 
 
     if(!iOS_fixedRes)
     {
-	  options.vector_width = 640;
-	  options.vector_height = 480;
+	  if (options.vector_width == 0) options.vector_width = 640;
+	  if (options.vector_height == 0) options.vector_height = 480;
     }
     else
     {
@@ -200,18 +91,6 @@ int mame_start_game(int game)
         }
     }
 	Machine->sample_rate = options.samplerate;
-
-	/* If the game has a single fixed-rate sound source, run the whole
-	 * audio pipeline at that source's rate so it is delivered to the
-	 * frontend without internal rate conversion.  The configured rate
-	 * is then only a hint for the games where this can't apply (no
-	 * fixed-rate source, more than one distinct fixed rate, or a
-	 * source whose rate is decided at runtime). */
-	{
-		int fixed_rate = game_fixed_output_rate();
-		if (fixed_rate > 0)
-			Machine->sample_rate = fixed_rate;
-	}
 
 	/* get orientation right */
 	Machine->orientation = gamedrv->flags & ORIENTATION_MASK;
@@ -264,66 +143,43 @@ int mame_start_game(int game)
 	set_pixel_functions();
 
 	/* Do the work*/
+	err = 1;
 	bailing = 0;
 
 	#ifdef MESS
 	if (get_filenames())
-		return 1;
+		return err;
 	#endif
 
-	if (osd_init() != 0)
+	if (osd_init() == 0)
 	{
-		if (!bailing) { bailing = 1; printf("Unable to initialize system\n"); }
-		return 1;
-	}
+		if (init_machine() == 0)
+		{
+			if (run_machine() == 0)
+				err = 0;
+			else if (!bailing)
+			{
+				bailing = 1;
+				printf("Unable to start machine emulation\n");
+			}
 
-	if (init_machine() != 0)
-	{
-		if (!bailing) { bailing = 1; printf("Unable to initialize machine emulation\n"); }
+			shutdown_machine();
+		}
+		else if (!bailing)
+		{
+			bailing = 1;
+			printf("Unable to initialize machine emulation\n");
+		}
+
 		osd_exit();
-		return 1;
 	}
-
-	if (run_machine_init() != 0)
+	else if (!bailing)
 	{
-		if (!bailing) { bailing = 1; printf("Unable to start machine emulation\n"); }
-		run_machine_exit();
-		shutdown_machine();
-		osd_exit();
-		return 1;
+		bailing = 1;
+		printf ("Unable to initialize system\n");
 	}
 
-	return 0;
-}
-
-/* Per-frame entry: drive one frame of CPU scheduling.  Each call runs
- * timer-driven CPU dispatch until osd_update_video_and_audio() sets
- * the yield flag (or until usres is raised).  Subsequent calls resume
- * the schedule from where the previous frame left off.
- *
- * When the MAME menu is up the game CPU is paused via the cross-TU
- * pause_action hook (src/cpuintrf.c): mame_pause(1) in src/usrintrf.c
- * installs pause_action_generic() as the per-frame body and we call
- * it here instead of cpu_run_step(), so cpu_execute() never runs
- * while the menu is on screen.  This mirrors mame2003-libretro's
- * mame_frame() in src/cpuexec.c.  Without this gate the same D-pad/B
- * press feeds both the menu (input_ui_pressed -> key[]) and the game
- * (memory-mapped input port reads inside cpu_execute()), so menu
- * navigation would also drive the player. */
-void mame_run_one_frame(void)
-{
-	if (pause_action)
-		pause_action();
-	else
-		cpu_run_step();
-}
-
-/* Tear down everything mame_start_game() set up, in reverse order. */
-void mame_end_game(void)
-{
-	run_machine_exit();
-	shutdown_machine();
-	osd_exit();
+	return err;
 }
 
 
@@ -510,179 +366,150 @@ static void scale_vectorgames(int gfx_width,int gfx_height,int *width,int *heigh
 
 static int vh_open(void)
 {
-    int i;
-    int width, height;
+	int i;
+	int width,height;
 
-    for (i = 0; i < MAX_GFX_ELEMENTS; i++) Machine->gfx[i] = 0;
-    Machine->uifont = 0;
 
-    if (palette_start() != 0)
-    {
-        vh_close();
-        return 1;
-    }
+	for (i = 0;i < MAX_GFX_ELEMENTS;i++) Machine->gfx[i] = 0;
+	Machine->uifont = 0;
 
-    /* convert the gfx ROMs into character sets with explicit safety checks for PS2 memory boundaries */
-    if (drv->gfxdecodeinfo)
-    {
-        for (i = 0; i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1; i++)
-        {
-            unsigned char *region_base = memory_region(drv->gfxdecodeinfo[i].memory_region);
-            if (!region_base)
-            {
-                vh_close();
-                bailing = 1;
-                printf("PS2 FATAL: Missing memory region for gfx decode index %d\n", i);
-                return 1;
-            }
+	if (palette_start() != 0)
+	{
+		vh_close();
+		return 1;
+	}
 
-            int reglen = 8 * memory_region_length(drv->gfxdecodeinfo[i].memory_region);
-            struct GfxLayout glcopy;
-            int j;
 
-            memcpy(&glcopy, drv->gfxdecodeinfo[i].gfxlayout, sizeof(glcopy));
+	/* convert the gfx ROMs into character sets. This is done BEFORE calling the driver's */
+	/* convert_color_prom() routine (in palette_init()) because it might need to check the */
+	/* Machine->gfx[] data */
+	if (drv->gfxdecodeinfo)
+	{
+		for (i = 0;i < MAX_GFX_ELEMENTS && drv->gfxdecodeinfo[i].memory_region != -1;i++)
+		{
+			int reglen = 8*memory_region_length(drv->gfxdecodeinfo[i].memory_region);
+			struct GfxLayout glcopy;
+			int j;
 
-            if (IS_FRAC(glcopy.total))
-                glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
-            for (j = 0; j < MAX_GFX_PLANES; j++)
-            {
-                if (IS_FRAC(glcopy.planeoffset[j]))
-                {
-                    glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
-                            reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
-                }
-            }
-            for (j = 0; j < MAX_GFX_SIZE; j++)
-            {
-                if (IS_FRAC(glcopy.xoffset[j]))
-                {
-                    glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
-                            reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
-                }
-                if (IS_FRAC(glcopy.yoffset[j]))
-                {
-                    glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
-                            reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
-                }
-            }
 
-            if ((Machine->gfx[i] = decodegfx(region_base + drv->gfxdecodeinfo[i].start, &glcopy)) == 0)
-            {
-                vh_close();
-                bailing = 1;
-                printf("PS2 OUT OF MEMORY: Failed decoding gfx index %d (heap exhausted)\n", i);
-                return 1;
-            }
-            if (Machine->remapped_colortable)
-                Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
-            Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
-        }
-    }
+			memcpy(&glcopy,drv->gfxdecodeinfo[i].gfxlayout,sizeof(glcopy));
 
-    width = drv->screen_width;
-    height = drv->screen_height;
+			if (IS_FRAC(glcopy.total))
+				glcopy.total = reglen / glcopy.charincrement * FRAC_NUM(glcopy.total) / FRAC_DEN(glcopy.total);
+			for (j = 0;j < MAX_GFX_PLANES;j++)
+			{
+				if (IS_FRAC(glcopy.planeoffset[j]))
+				{
+					glcopy.planeoffset[j] = FRAC_OFFSET(glcopy.planeoffset[j]) +
+							reglen * FRAC_NUM(glcopy.planeoffset[j]) / FRAC_DEN(glcopy.planeoffset[j]);
+				}
+			}
+			for (j = 0;j < MAX_GFX_SIZE;j++)
+			{
+				if (IS_FRAC(glcopy.xoffset[j]))
+				{
+					glcopy.xoffset[j] = FRAC_OFFSET(glcopy.xoffset[j]) +
+							reglen * FRAC_NUM(glcopy.xoffset[j]) / FRAC_DEN(glcopy.xoffset[j]);
+				}
+				if (IS_FRAC(glcopy.yoffset[j]))
+				{
+					glcopy.yoffset[j] = FRAC_OFFSET(glcopy.yoffset[j]) +
+							reglen * FRAC_NUM(glcopy.yoffset[j]) / FRAC_DEN(glcopy.yoffset[j]);
+				}
+			}
 
-    if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
-        scale_vectorgames(options.vector_width, options.vector_height, &width, &height);
+			if ((Machine->gfx[i] = decodegfx(memory_region(drv->gfxdecodeinfo[i].memory_region)
+					+ drv->gfxdecodeinfo[i].start,
+					&glcopy)) == 0)
+			{
+				vh_close();
 
-    Machine->scrbitmap = bitmap_alloc_depth(width, height, Machine->color_depth);
-    if (!Machine->scrbitmap)
-    {
-        vh_close();
-        return 1;
-    }
+				bailing = 1;
+				printf("Out of memory decoding gfx\n");
 
-    if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
-    {
-        width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
-        height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
-    }
+				return 1;
+			}
+			if (Machine->remapped_colortable)
+				Machine->gfx[i]->colortable = &Machine->remapped_colortable[drv->gfxdecodeinfo[i].color_codes_start];
+			Machine->gfx[i]->total_colors = drv->gfxdecodeinfo[i].total_color_codes;
+		}
+	}
 
-    if (Machine->orientation & ORIENTATION_SWAP_XY)
-    {
-        int temp;
-        temp = width; width = height; height = temp;
-    }
 
-    /* create the display bitmap, and allocate the palette */
-    if (osd_create_display(width, height, Machine->color_depth,
-            drv->frames_per_second, drv->video_attributes, Machine->orientation))
-    {
-        printf("DEBUG FAIL: osd_create_display failed. w=%d, h=%d, depth=%d\n", width, height, Machine->color_depth);
-        vh_close();
-        return 1;
-    }
+	width = drv->screen_width;
+	height = drv->screen_height;
 
-    set_visible_area(
-            drv->default_visible_area.min_x,
-            drv->default_visible_area.max_x,
-            drv->default_visible_area.min_y,
-            drv->default_visible_area.max_y);
+	if (Machine->drv->video_attributes & VIDEO_TYPE_VECTOR)
+		scale_vectorgames(options.vector_width,options.vector_height,&width,&height);
 
-    /* create spriteram buffers safely with allocation checks and clearing to prevent uninitialized faults */
-    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
-        if (spriteram_size != 0) {
-            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
-            if (!buffered_spriteram) { vh_close(); return 1; }
-            memset(buffered_spriteram, 0, spriteram_size);
+	Machine->scrbitmap = bitmap_alloc_depth(width,height,Machine->color_depth);
+	if (!Machine->scrbitmap)
+	{
+		vh_close();
+		return 1;
+	}
 
-            if (spriteram_2_size != 0) {
-                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
-                if (!buffered_spriteram_2) { vh_close(); return 1; }
-                memset(buffered_spriteram_2, 0, spriteram_2_size);
-            }
-        } else {
-            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
-            buffered_spriteram = NULL;
-            buffered_spriteram_2 = NULL;
-        }
-    }
+	if (!(Machine->drv->video_attributes & VIDEO_TYPE_VECTOR))
+	{
+		width = drv->default_visible_area.max_x - drv->default_visible_area.min_x + 1;
+		height = drv->default_visible_area.max_y - drv->default_visible_area.min_y + 1;
+	}
 
-    /* build our private user interface font */
-    if ((Machine->uifont = builduifont()) == 0)
-    {
-        vh_close();
-        return 1;
-    }
+	if (Machine->orientation & ORIENTATION_SWAP_XY)
+	{
+		int temp;
+		temp = width; width = height; height = temp;
+	}
 
-    /* initialize the palette */
-    if (palette_init())
-    {
-        vh_close();
-        return 1;
-    }
-	
-	/* create spriteram buffers safely with strict pointer validation */
-    if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
-        if (spriteram_size != 0) {
-            buffered_spriteram = (unsigned char *) malloc(spriteram_size);
-            
-            // Check for NULL or dangerous high-address returns (e.g., 0x3000xxxx)
-            if (!buffered_spriteram || ((unsigned int)buffered_spriteram & 0xF0000000)) {
-                printf("FATAL: buffered_spriteram allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram, spriteram_size);
-                vh_close(); 
-                return 1;
-            }
-            memset(buffered_spriteram, 0, spriteram_size);
+	/* create the display bitmap, and allocate the palette */
+	if (osd_create_display(width,height,Machine->color_depth,
+			drv->frames_per_second,drv->video_attributes,Machine->orientation))
+	{
+		vh_close();
+		return 1;
+	}
 
-            if (spriteram_2_size != 0) {
-                buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
-                if (!buffered_spriteram_2 || ((unsigned int)buffered_spriteram_2 & 0xF0000000)) {
-                    printf("FATAL: buffered_spriteram_2 allocation invalid! Ptr: %p, Size: %d\n", buffered_spriteram_2, spriteram_2_size);
-                    vh_close(); 
-                    return 1;
-                }
-                memset(buffered_spriteram_2, 0, spriteram_2_size);
-            }
-        } else {
-            logerror("vh_open(): Video buffers spriteram but spriteram_size is 0\n");
-            buffered_spriteram = NULL;
-            buffered_spriteram_2 = NULL;
-        }
-    }
+	set_visible_area(
+			drv->default_visible_area.min_x,
+			drv->default_visible_area.max_x,
+			drv->default_visible_area.min_y,
+			drv->default_visible_area.max_y);
 
-    return 0;
+	/* create spriteram buffers if necessary */
+	if (drv->video_attributes & VIDEO_BUFFERS_SPRITERAM) {
+		if (spriteram_size!=0) {
+			buffered_spriteram= (unsigned char *) malloc(spriteram_size);
+			if (!buffered_spriteram) { vh_close(); return 1; }
+			if (spriteram_2_size!=0) buffered_spriteram_2 = (unsigned char *) malloc(spriteram_2_size);
+			if (spriteram_2_size && !buffered_spriteram_2) { vh_close(); return 1; }
+		} else {
+			logerror("vh_open():  Video buffers spriteram but spriteram_size is 0\n");
+			buffered_spriteram=NULL;
+			buffered_spriteram_2=NULL;
+		}
+	}
+
+	/* build our private user interface font */
+	/* This must be done AFTER osd_create_display() so the function knows the */
+	/* resolution we are running at and can pick a different font depending on it. */
+	/* It must be done BEFORE palette_init() because that will also initialize */
+	/* (through osd_allocate_colors()) the uifont colortable. */
+	if ((Machine->uifont = builduifont()) == 0)
+	{
+		vh_close();
+		return 1;
+	}
+
+	/* initialize the palette - must be done after osd_create_display() */
+	if (palette_init())
+	{
+		vh_close();
+		return 1;
+	}
+
+	return 0;
 }
+
 
 
 /***************************************************************************
@@ -693,19 +520,12 @@ static int vh_open(void)
 ***************************************************************************/
 
 int need_to_clear_bitmap;	/* set by the user interface */
+extern unsigned retro_hook_quit;
 
 int updatescreen(void)
 {
-	/* Substitute silence for sound_update() while the game is paused:
-	 * pause_action_generic() (running on behalf of mame_run_one_frame())
-	 * skips cpu_run_step(), so the sound chips have not advanced and
-	 * the mixer/streams chain would just re-emit the last live frame's
-	 * residual audio every tick -- audible as a buzz under the menu.
-	 * Mirror mame2003-libretro's src/mame.c:1324-1325. */
-	if (pause_action)
-		osd_update_silent_stream();
-	else
-		sound_update();
+	/* update sound */
+	// sound_update();
 
 	if (osd_skip_this_frame() == 0)
 	{
@@ -731,12 +551,7 @@ int updatescreen(void)
 
 	if (drv->vh_eof_callback) (*drv->vh_eof_callback)();
 
-	/* retro_hook_quit is gone with libco: retro_unload_game now drives
-	 * the teardown synchronously via mame_end_game(), so updatescreen()
-	 * no longer needs to propagate an external "quit" signal through
-	 * the timer system.  The only quit path is handle_user_interface()
-	 * returning 1 above, which already short-circuits to return 1. */
-	return 0;
+	return retro_hook_quit;
 }
 
 
@@ -776,172 +591,130 @@ void update_video_and_audio(void)
   Returns non zero in case of error.
 
 ***************************************************************************/
-/* Tracks how far run_machine_init() got, so run_machine_exit() can
- * unwind only what was actually initialised.  Values:
- *   0  nothing started
- *   1  vh_open done (need vh_close + tilemap/sprite/gfxobj_close)
- *   2  drv->vh_start done (need drv->vh_stop)
- *   3  sound_start done (need sound_stop)
- *   4  init_user_interface + cheat done (need save_input_port_settings + StopCheat)
- *   5  cpu_run_init done (need cpu_run_exit + NVRAM save)
- */
-static int rm_state = 0;
-
-/* Set up everything required for the per-frame cpu_run_step() to be
- * called: open the video output, initialise tilemap/sprite/gfxobj,
- * start the driver's video and audio, free DISPOSE memory regions,
- * load NVRAM, then arm the CPU scheduler.  Returns 0 on success,
- * non-zero on failure; on failure rm_state records how far we got
- * so run_machine_exit() can unwind correctly. */
-static int run_machine_init(void)
+int run_machine(void)
 {
-    rm_state = 0;
+	int res = 1;
 
-    if (vh_open() != 0)
-    {
-        if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
-        return 1;
-    }
-    rm_state = 1;
 
-    tilemap_init();
-    sprite_init();
-    gfxobj_init();
-
-    if (drv->vh_start != 0 && (*drv->vh_start)() != 0)
-    {
-        if (!bailing) { bailing = 1; printf("Unable to start video emulation\n"); }
-        return 1;
-    }
-    rm_state = 2;
-
-    if (sound_start() != 0)
-    {
-        if (!bailing) { bailing = 1; printf("Unable to start audio emulation\n"); }
-        return 1;
-    }
-    rm_state = 3;
-
-    real_scrbitmap = artwork_overlay ? overlay_real_scrbitmap : Machine->scrbitmap;
-
-    /* Free memory regions allocated with REGIONFLAG_DISPOSE (typically gfx roms).
-     * Optimized for the PlayStation 2 EE architecture: replaced the slow,
-     * non-deterministic byte-by-byte rand() loop with a vectorized 64-bit qword 
-     * clearing pattern using inline pointers, eliminating cache thrashing 
-     * and speeding up initialization times. */
-    {
-        int region;
-        for (region = 0; region < MAX_MEMORY_REGIONS; region++)
-        {
-            if (Machine->memory_region_type[region] & REGIONFLAG_DISPOSE)
-            {
-                int length = memory_region_length(region);
-                uint8_t *dest_ptr = memory_region(region);
-
-                if (dest_ptr && length > 0)
-                {
-                    int qwords = length >> 3;
-                    int rem = length & 7;
-                    uint64_t *d64 = (uint64_t *)dest_ptr;
-
-                    int i = 0;
-                    for (; i <= qwords - 4; i += 4)
-                    {
-                        d64[i]     = 0;
-                        d64[i + 1] = 0;
-                        d64[i + 2] = 0;
-                        d64[i + 3] = 0;
-                    }
-                    for (; i < qwords; i++)
-                    {
-                        d64[i] = 0;
-                    }
-
-                    if (rem)
-                    {
-                        uint8_t *d8 = dest_ptr;
-                        int offset = qwords << 3;
-                        for (int b = 0; b < rem; b++)
-                        {
-                            d8[offset + b] = 0;
-                        }
-                    }
-                }
-
-                free(Machine->memory_region[region]);
-                Machine->memory_region[region] = 0;
-            }
-        }
-    }
-
-    /* The libretro build stubs showcopyright() and showgamewarnings() to
-     * return 0, so the historical "userquit" goto-label inside the
-     * disclaimer branch is unreachable; the calls are kept here only so
-     * that a non-libretro build pulling this TU would still get the
-     * original control flow. */
-    if (settingsloaded == 0 && !options.skip_disclaimer)
-        (void)showcopyright(real_scrbitmap);
-    (void)showgamewarnings(real_scrbitmap);
-
-    /* shut down the leds (work around Allegro hanging bug in the DOS port) */
-    osd_led_w(0, 1); osd_led_w(1, 1); osd_led_w(2, 1); osd_led_w(3, 1);
-    osd_led_w(0, 0); osd_led_w(1, 0); osd_led_w(2, 0); osd_led_w(3, 0);
-
-    init_user_interface();
-
-    /* disable cheat if no roms */
-    if (!gamedrv->rom) options.cheat = 0;
-    if (options.cheat) InitCheat();
-    rm_state = 4;
-
-    if (drv->nvram_handler)
-    {
-        void *f = osd_fopen(Machine->gamedrv->name, 0, OSD_FILETYPE_NVRAM, 0);
-        (*drv->nvram_handler)(f, 0);
-        if (f) osd_fclose(f);
-    }
-
-    cpu_run_init();
-    rm_state = 5;
-    return 0;
-}
-
-/* Reverse-order teardown of run_machine_init(), gated by rm_state so a
- * mid-init failure unwinds only what succeeded. */
-static void run_machine_exit(void)
-{
-	if (rm_state >= 5)
+	if (vh_open() == 0)
 	{
-		cpu_run_exit();
-
-		if (drv->nvram_handler)
+		tilemap_init();
+		sprite_init();
+		gfxobj_init();
+		if (drv->vh_start == 0 || (*drv->vh_start)() == 0)      /* start the video hardware */
 		{
-			void *f;
-			if ((f = osd_fopen(Machine->gamedrv->name, 0, OSD_FILETYPE_NVRAM, 1)) != 0)
+			if (sound_start() == 0) /* start the audio hardware */
 			{
-				(*drv->nvram_handler)(f, 1);
-				osd_fclose(f);
+				int	region;
+
+				real_scrbitmap = artwork_overlay ? overlay_real_scrbitmap : Machine->scrbitmap;
+
+				/* free memory regions allocated with REGIONFLAG_DISPOSE (typically gfx roms) */
+				for (region = 0; region < MAX_MEMORY_REGIONS; region++)
+				{
+					if (Machine->memory_region_type[region] & REGIONFLAG_DISPOSE)
+					{
+						int i;
+
+						/* invalidate contents to avoid subtle bugs */
+						for (i = 0;i < memory_region_length(region);i++)
+							memory_region(region)[i] = rand();
+						free(Machine->memory_region[region]);
+						Machine->memory_region[region] = 0;
+					}
+				}
+
+				if (settingsloaded == 0)
+				{
+					/* if there is no saved config, it must be first time we run this game, */
+					/* so show the disclaimer. */
+					if (!options.skip_disclaimer)
+					{
+						if (showcopyright(real_scrbitmap)) goto userquit;
+					}
+				}
+
+				if (showgamewarnings(real_scrbitmap) == 0)  /* show info about incorrect behaviour (wrong colors etc.) */
+				{
+					/* shut down the leds (work around Allegro hanging bug in the DOS port) */
+					osd_led_w(0,1);
+					osd_led_w(1,1);
+					osd_led_w(2,1);
+					osd_led_w(3,1);
+					osd_led_w(0,0);
+					osd_led_w(1,0);
+					osd_led_w(2,0);
+					osd_led_w(3,0);
+
+					init_user_interface();
+
+					/* disable cheat if no roms */
+					if (!gamedrv->rom) options.cheat = 0;
+
+					if (options.cheat) InitCheat();
+
+					if (drv->nvram_handler)
+					{
+						void *f;
+
+						f = osd_fopen(Machine->gamedrv->name,0,OSD_FILETYPE_NVRAM,0);
+						(*drv->nvram_handler)(f,0);
+						if (f) osd_fclose(f);
+					}
+
+					cpu_run();      /* run the emulation! */
+
+					if (drv->nvram_handler)
+					{
+						void *f;
+
+						if ((f = osd_fopen(Machine->gamedrv->name,0,OSD_FILETYPE_NVRAM,1)) != 0)
+						{
+							(*drv->nvram_handler)(f,1);
+							osd_fclose(f);
+						}
+					}
+
+					if (options.cheat) StopCheat();
+
+					/* save input ports settings */
+					save_input_port_settings();
+				}
+
+userquit:
+				/* the following MUST be done after hiscore_save() otherwise */
+				/* some 68000 games will not work */
+				sound_stop();
+				if (drv->vh_stop) (*drv->vh_stop)();
+				overlay_free();
+				backdrop_free();
+
+				res = 0;
+			}
+			else if (!bailing)
+			{
+				bailing = 1;
+				printf("Unable to start audio emulation\n");
 			}
 		}
-	}
-	if (rm_state >= 4)
-	{
-		if (options.cheat) StopCheat();
-		/* save input ports settings */
-		save_input_port_settings();
-	}
-	if (rm_state >= 3) sound_stop();
-	if (rm_state >= 2 && drv->vh_stop) (*drv->vh_stop)();
-	if (rm_state >= 1)
-	{
-		overlay_free();
-		backdrop_free();
+		else if (!bailing)
+		{
+			bailing = 1;
+			printf("Unable to start video emulation\n");
+		}
+
 		gfxobj_close();
 		sprite_close();
 		tilemap_close();
 		vh_close();
 	}
-	rm_state = 0;
+	else if (!bailing)
+	{
+		bailing = 1;
+		printf("Unable to start video emulation\n");
+	}
+
+	return res;
 }
 
 

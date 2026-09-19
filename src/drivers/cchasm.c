@@ -25,7 +25,7 @@ void cchasm_init_colors (unsigned char *palette, unsigned short *colortable,cons
 int cchasm_vh_start (void);
 void cchasm_vh_stop (void);
 
-extern uint8_t *cchasm_ram;
+extern UINT8 *cchasm_ram;
 
 /* from sndhrdw/cchasm.c */
 WRITE_HANDLER( cchasm_io_w );

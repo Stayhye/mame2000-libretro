@@ -1,20 +1,14 @@
 DEBUG=0
+WANT_LIBCO = 1
 DISABLE_ERROR_LOGGING = 1
 #set later according to platform
 IS_X86 = 0
 TARGET_NAME = mame2000
 
 CORE_DIR = .
-CFLAGS += -fsigned-char
 
 ifeq (,$(findstring msvc,$(platform)))
 GCC_DEFINES := -Wno-sign-compare -Wunused -Wpointer-arith -Waggregate-return -Wshadow
-endif
-
-ifneq ($(SANITIZER),)
-   CFLAGS   := -fsanitize=$(SANITIZER) $(CFLAGS)
-   CXXFLAGS := -fsanitize=$(SANITIZER) $(CXXFLAGS)
-   LDFLAGS  := -fsanitize=$(SANITIZER) $(LDFLAGS)
 endif
 
 GIT_VERSION ?= " $(shell git rev-parse --short HEAD || echo unknown)"
@@ -68,27 +62,19 @@ ifeq ($(platform), unix)
 ifneq ($(ARM), 1)
    IS_X86 = 1
 endif
+ifneq ($(WANT_LIBCO), 1)
+	SHARED += -lpthread
+endif
 
 # OS X
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
 ifeq ($(arch),ppc)
-	CFLAGS += -D__ppc__ -DMSB_FIRST
+		CFLAGS += -D__ppc__ -DMSB_FIRST
 endif
    SHARED := -dynamiclib
-ifeq ($(shell uname -p),i386)
    IS_X86 = 1
-endif
-   CFLAGS += -DHAVE_POSIX_MEMALIGN
-
-   ifeq ($(CROSS_COMPILE),1)
-		TARGET_RULE   = -target $(LIBRETRO_APPLE_PLATFORM) -isysroot $(LIBRETRO_APPLE_ISYSROOT)
-		CFLAGS   += $(TARGET_RULE)
-		CPPFLAGS += $(TARGET_RULE)
-		CXXFLAGS += $(TARGET_RULE)
-		LDFLAGS  += $(TARGET_RULE)
-   endif
 
 # iOS
 else ifneq (,$(findstring ios,$(platform)))
@@ -105,10 +91,10 @@ CFLAGS += -DIOS -D__arm__ -DHAVE_POSIX_MEMALIGN=1
 
 ifeq ($(platform),ios-arm64)
    CC = cc -arch arm64 -isysroot $(IOSSDK)
-   LD = arm64-apple-darwin14-ld
+	LD = armv7-apple-darwin11-ld
 else
    CC = cc -arch armv7 -isysroot $(IOSSDK)
-   LD = armv7-apple-darwin11-ld
+	LD = armv7-apple-darwin11-ld
 endif
 
 ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
@@ -117,17 +103,6 @@ else
    CC += -miphoneos-version-min=5.0
 endif
 
-# PS2
-else ifeq ($(platform), ps2)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = ee-gcc$(EXE_EXT)
-   CXX = ee-g++$(EXE_EXT)
-   AR = ee-ar$(EXE_EXT)
-   FLAGS += -DPS2 -G0 -DABGR1555
-   STATIC_LINKING = 1
-   STATIC_LINKING_LINK = 1
-   FRONTEND_SUPPORTS_RGB565 = 0
-
 # tvOS
 else ifeq ($(platform), tvos-arm64)
 	TARGET := $(TARGET_NAME)_libretro_tvos.dylib
@@ -135,26 +110,45 @@ else ifeq ($(platform), tvos-arm64)
 	SHARED := -dynamiclib
 	CFLAGS += -DHAVE_POSIX_MEMALIGN
 
-
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
 endif
 
-   CFLAGS += -DIOS -D__arm__ -DHAVE_POSIX_MEMALIGN=1
-   CC = cc -arch arm64 -isysroot $(IOSSDK)
+CFLAGS += -DIOS -D__arm__ -DHAVE_POSIX_MEMALIGN=1
+
+# PS3
+else ifeq ($(platform), ps3)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
+   AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
+   ENDIANNESS_DEFINES := -DMSB_FIRST
+   PLATFORM_DEFINES := -D__CELLOS_LV2__ -D__ppc__
+   HAVE_RZLIB := 1
+   STATIC_LINKING := 1
+
+# PS3 (SNC)
+else ifeq ($(platform), sncps3)
+   TARGET := $(TARGET_NAME)_libretro_ps3.a
+   CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
+   AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
+   ENDIANNESS_DEFINES := -DMSB_FIRST
+   CFLAGS += -DWORDS_BIGENDIAN=1
+   GCC_DEFINES :=
+   PLATFORM_DEFINES := -D__CELLOS_LV2__ -D__ppc__
+   HAVE_RZLIB := 1
+   STATIC_LINKING := 1
 
 # Lightweight PS3 Homebrew SDK
-else ifneq (,$(filter $(platform), ps3 psl1ght))
-	TARGET := $(TARGET_NAME)_libretro_$(platform).a
-	CC = $(PS3DEV)/ppu/bin/ppu-$(COMMONLV)gcc$(EXE_EXT)
-	AR = $(PS3DEV)/ppu/bin/ppu-$(COMMONLV)ar$(EXE_EXT)
-	ENDIANNESS_DEFINES := -DMSB_FIRST
-	PLATFORM_DEFINES := -D__PS3__ -D__ppc__
-	ifeq ($(platform), psl1ght)
-		PLATFORM_DEFINES += -D__PSL1GHT__
-	endif
-	HAVE_RZLIB := 1
-	STATIC_LINKING := 1
+else ifeq ($(platform), psl1ght)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
+   AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
+   ENDIANNESS_DEFINES := -DMSB_FIRST
+   CFLAGS += -DWORDS_BIGENDIAN=1
+   GCC_DEFINES :=
+   PLATFORM_DEFINES := -D__CELLOS_LV2__ -D__ppc__
+   HAVE_RZLIB := 1
+   STATIC_LINKING := 1
 
 # Xbox 360 (libxenon)
 else ifeq ($(platform), xenon)
@@ -185,6 +179,10 @@ else ifeq ($(platform), qnx)
    PLATCFLAGS += -march=armv7-a -Dstricmp=strcasecmp
    LDFLAGS += -fPIC -shared -Wl,--version-script=link.T
 
+ifneq ($(WANT_LIBCO), 1)
+	SHARED += -lpthread
+endif
+
    CC = qcc -Vgcc_ntoarmv7le
    AR = qcc -Vgcc_ntoarmv7le
    LD = QCC -Vgcc_ntoarmv7le
@@ -206,7 +204,7 @@ include $(DEVKITPRO)/libnx/switch_rules
     EXT=a
     TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
     DEFINES := -DSWITCH=1 -U__linux__ -U__linux
-    CFLAGS := $(DEFINES) -g -O3 -fPIE -I$(LIBNX)/include/ -ffunction-sections -fdata-sections -fcommon -ftls-model=local-exec -Wl,--allow-multiple-definition -specs=$(LIBNX)/switch.specs
+    CFLAGS := $(DEFINES) -g -O3 -fPIE -I$(LIBNX)/include/ -ffunction-sections -fdata-sections -ftls-model=local-exec -Wl,--allow-multiple-definition -specs=$(LIBNX)/switch.specs
     CFLAGS += $(INCDIRS)
     CFLAGS	+=	$(INCLUDE)  -D__SWITCH__
     CXXFLAGS := $(ASFLAGS) $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
@@ -221,7 +219,7 @@ else ifeq ($(platform), wiiu)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    ENDIANNESS_DEFINES := -DMSB_FIRST
-   PLATFORM_DEFINES += -DGEKKO -DWIIU -DHW_RVL -D__wiiu__ -DHW_WUP -ffunction-sections -fdata-sections -mcpu=750 -meabi -mhard-float
+   PLATFORM_DEFINES += -DGEKKO -DWIIU -DHW_RVL -mwup -mcpu=750 -meabi -mhard-float
    PLATFORM_DEFINES += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
    HAVE_RZLIB := 1
    STATIC_LINKING := 1
@@ -287,6 +285,44 @@ else ifeq ($(platform), ctr)
    ARM = 1
    STATIC_LINKING := 1
 
+# PS2
+else ifeq ($(platform), ps2)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = mips64r5900el-ps2-elf-gcc$(EXE_EXT)
+   AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
+   CFLAGS += -D_EE -DPS2 -DABGR1555 -G0
+   CFLAGS += -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include -I$(PS2DEV)/gsKit/include
+   # CFLAGS += -fsingle-precision-constant
+   CFLAGS += -Wall
+   # CFLAGS += -fomit-frame-pointer -ffast-math
+   # CFLAGS += -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables 
+   # CFLAGS += -ftree-vectorize -funroll-loops -fno-optimize-sibling-calls
+   HAVE_RZLIB := 1
+   DISABLE_ERROR_LOGGING := 1
+   ARM = 0
+   STATIC_LINKING := 1
+   USE_CYCLONE = 0
+   USE_DRZ80 = 0
+
+# PSP
+else ifeq ($(platform), psp1)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).a
+   CC = psp-gcc$(EXE_EXT)
+   AR = psp-ar$(EXE_EXT)
+   CFLAGS += -DPSP -G0
+   CFLAGS += -I$(shell psp-config --pspsdk-path)/include
+   CFLAGS += -fsingle-precision-constant
+   CFLAGS += -Wall
+   CFLAGS += -fomit-frame-pointer -ffast-math
+   CFLAGS += -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables 
+   CFLAGS += -ftree-vectorize -funroll-loops -fno-optimize-sibling-calls
+   HAVE_RZLIB := 1
+   DISABLE_ERROR_LOGGING := 1
+   ARM = 0
+   STATIC_LINKING := 1
+   USE_CYCLONE = 0
+   USE_DRZ80 = 0
+
 # Vita
 else ifeq ($(platform), vita)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
@@ -296,7 +332,7 @@ else ifeq ($(platform), vita)
    CFLAGS += -mfloat-abi=hard -fsingle-precision-constant
    CFLAGS += -Wall -mword-relocations
    CFLAGS += -fomit-frame-pointer -ffast-math
-   CFLAGS += -fno-exceptions -fcommon -fno-unwind-tables -fno-asynchronous-unwind-tables 
+   CFLAGS += -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables 
    CFLAGS += -ftree-vectorize -funroll-loops -fno-optimize-sibling-calls
    HAVE_RZLIB := 1
    DISABLE_ERROR_LOGGING := 1
@@ -311,7 +347,7 @@ else ifeq ($(platform), emscripten)
    HAVE_RZLIB := 1
    DISABLE_ERROR_LOGGING := 1
    STATIC_LINKING := 1
-   CFLAGS += -Wno-int-conversion
+   WANT_LIBCO := 0
 
 # GCW0
 else ifeq ($(platform), gcw0)
@@ -323,20 +359,6 @@ else ifeq ($(platform), gcw0)
    
    DISABLE_ERROR_LOGGING := 1
    CFLAGS += -march=mips32 -mtune=mips32r2 -mhard-float
-
-# MIYOO
-else ifeq ($(platform), miyoo)
-   TARGET := $(TARGET_NAME)_libretro.so
-   CC = /opt/miyoo/usr/bin/arm-linux-gcc
-   AR = /opt/miyoo/usr/bin/arm-linux-ar
-   fpic := -fPIC
-   SHARED := -shared -Wl,--version-script=link.T -Wl,-no-undefined
-   
-   DISABLE_ERROR_LOGGING := 1
-   CFLAGS += -fomit-frame-pointer -ffast-math -march=armv5te -mtune=arm926ej-s
-  	ARM = 1
-   USE_CYCLONE = 1
-   USE_DRZ80 = 1
 
 # Windows MSVC 2010 x64
 else ifeq ($(platform), windows_msvc2010_x64)
@@ -441,7 +463,7 @@ else ifneq (,$(findstring windows_msvc2017,$(platform)))
 	reg_query = $(call filter_out2,$(subst $2,,$(shell reg query "$2" -v "$1" 2>nul)))
 	fix_path = $(subst $(SPACE),\ ,$(subst \,/,$1))
 
-	ProgramFiles86w := $(shell cmd //c "echo %PROGRAMFILES(x86)%")
+	ProgramFiles86w := $(shell cmd /c "echo %PROGRAMFILES(x86)%")
 	ProgramFiles86 := $(shell cygpath "$(ProgramFiles86w)")
 
 	WindowsSdkDir ?= $(call reg_query,InstallationFolder,HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\Microsoft SDKs\Windows\v10.0)
@@ -526,7 +548,7 @@ endif
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -g
 else
-CFLAGS += -O2 -DNDEBUG
+CFLAGS += -O3 -DNDEBUG
 endif
 
 # compiler, linker and utilities
@@ -544,15 +566,6 @@ INCFLAGS :=
 include Makefile.common
 
 DEFS += $(fpic) $(PLATFORM_DEFINES) $(ZLIB_INCLUDE) $(GCC_DEFINES) $(INCFLAGS) $(INCFLAGS_PLATFORM)
-
-ifneq (,$(findstring msvc,$(platform)))
-ifeq ($(DEBUG),1)
-DEFS += -MTd
-else
-DEFS += -MT
-endif
-endif
-
 # combine the various definitions to one
 CDEFS +=  $(ENDIANNESS_DEFINES) $(DEFS) $(COREDEFS) $(CPUDEFS) $(SOUNDDEFS)
 
@@ -572,9 +585,12 @@ endif
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-ifeq ($(STATIC_LINKING), 1)
+ifeq ($(platform), emscripten)
+	$(CC) $(CFLAGS) $(OBJECTS) $(OBJOUT)$@
+else ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
+	@echo Linking $@...
 	$(LD) $(SHARED) $(LDFLAGS) $(OBJECTS) $(LIBS) $(LINKOUT)$@
 endif
     

@@ -9,15 +9,15 @@
 
 
 /* from the main driver */
-extern uint8_t *starfire_videoram;
-extern uint8_t *starfire_colorram;
+extern UINT8 *starfire_videoram;
+extern UINT8 *starfire_colorram;
 
 /* local allocated storage */
-static uint8_t *scanline_dirty;
+static UINT8 *scanline_dirty;
 
-static uint8_t starfire_vidctrl;
-static uint8_t starfire_vidctrl1;
-static uint8_t starfire_color;
+static UINT8 starfire_vidctrl;
+static UINT8 starfire_vidctrl1;
+static UINT8 starfire_color;
 
 
 
@@ -260,8 +260,8 @@ READ_HANDLER( starfire_videoram_r )
 
 void starfire_video_update(int scanline, int count)
 {
-	uint8_t *pix = &starfire_videoram[scanline];
-	uint8_t *col = &starfire_colorram[scanline];
+	UINT8 *pix = &starfire_videoram[scanline];
+	UINT8 *col = &starfire_colorram[scanline];
 	int x, y;
 
 	/* update any dirty scanlines in this range */

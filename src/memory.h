@@ -2,7 +2,6 @@
 #define MEMORY_H
 
 #include "osd_cpu.h"
-#include <retro_inline.h>
 #include <stddef.h>
 
 
@@ -14,11 +13,11 @@
 ***************************************************************************/
 
 /* ----- typedefs for data and offset types ----- */
-typedef uint8_t			data8_t;
-typedef uint16_t			data16_t;
-typedef uint32_t			data32_t;
-typedef uint32_t offs_t;
-typedef uint32_t data_t;
+typedef UINT8			data8_t;
+typedef UINT16			data16_t;
+typedef UINT32			data32_t;
+typedef UINT32 offs_t;
+typedef UINT32 data_t;
 
 typedef data_t (*mem_read_handler)(offs_t offset);
 typedef void (*mem_write_handler)(offs_t offset,data_t data);
@@ -245,40 +244,8 @@ extern unsigned char *cpu_bankbase[];	/* array of bank bases */
 ***************************************************************************/
 
 /* ----- 16-bit memory accessing ----- */
-/*
- * On strict-alignment hosts (ARMv5, MIPS without unaligned access, etc.)
- * the fast "*(uint16_t *)" cast can fault or silently corrupt data when
- * the byte pointer is odd.  ALIGN_SHORTS, defined globally in
- * Makefile.common, switches us to byte-by-byte loads that are always
- * safe.  This matches the pattern already used in machine/wmsyunit.c.
- */
-#ifndef ALIGN_SHORTS
-    #define READ_WORD(a)      (*(uint16_t *)(a))
-    #define WRITE_WORD(a,d)   (*(uint16_t *)(a) = (d))
-#else
-    static INLINE uint16_t _mame_read_word(const void *a)
-    {
-        const uint8_t *p = (const uint8_t *)a;
-    #ifdef MSB_FIRST
-        return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
-    #else
-        return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-    #endif
-    }
-    static INLINE void _mame_write_word(void *a, uint16_t d)
-    {
-        uint8_t *p = (uint8_t *)a;
-    #ifdef MSB_FIRST
-        p[0] = (uint8_t)(d >> 8);
-        p[1] = (uint8_t)d;
-    #else
-        p[0] = (uint8_t)d;
-        p[1] = (uint8_t)(d >> 8);
-    #endif
-    }
-    #define READ_WORD(a)      _mame_read_word((a))
-    #define WRITE_WORD(a,d)   _mame_write_word((a), (uint16_t)(d))
-#endif
+#define READ_WORD(a)		  (*(UINT16 *)(a))
+#define WRITE_WORD(a,d) 	  (*(UINT16 *)(a) = (d))
 #define COMBINE_WORD(w,d)	  (((w) & ((d) >> 16)) | ((d) & 0xffff))
 #define COMBINE_WORD_MEM(a,d) (WRITE_WORD((a), (READ_WORD(a) & ((d) >> 16)) | (d)))
 
@@ -315,7 +282,7 @@ extern unsigned char *cpu_bankbase[];	/* array of bank bases */
 {														\
 	if (bank >= 1 && bank <= MAX_BANKS) 				\
 	{													\
-		cpu_bankbase[bank] = (uint8_t *)(base);			\
+		cpu_bankbase[bank] = (UINT8 *)(base);			\
 		if (ophw == bank)								\
 		{												\
 			ophw = 0xff;								\
